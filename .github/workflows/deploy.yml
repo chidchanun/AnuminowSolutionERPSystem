@@ -15,7 +15,7 @@ jobs:
       - name: Install
         run: 
           cd ~/AnuminowSolutionERPSystem
-          npm ci
+          npm i
       
       - name: Build
         run: 

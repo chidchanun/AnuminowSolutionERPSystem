@@ -89,7 +89,7 @@ export async function POST(request) {
 
         // บันทึกผู้ใช้ใหม่ลงตาราง user
         await db.query(
-            `INSERT INTO user (id, prefix, first_name_th, last_name_th, first_name_en, last_name_en, email, phone, password_hash, department_id, role_id, picture_path, permission_role_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            `INSERT INTO user (id, prefix, first_name_th, last_name_th, first_name_en, last_name_en, email, phone, password_hash, department_id, role_id, picture_path, permission_role_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,?)`,
             [CreateUserId, prefix, first_name_th, last_name_th, first_name_en, last_name_en, email, phone, passwordHash, department_id, role_id, picture_path, 4]
         )
 

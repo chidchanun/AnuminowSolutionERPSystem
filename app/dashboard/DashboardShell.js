@@ -133,8 +133,8 @@ export default function DashboardShell({ children }) {
             />
 
             <Sidebar sidebarOpen={sidebarOpen} onLogout={handleLogout} onClose={() => setSidebarOpen(false)} user={user} />
-            <div className="flex flex-col w-screen min-h-screen py-2 px-10">
-                <div className="sticky top-0 z-10 flex items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50/90 dark:bg-slate-950/90  py-4 backdrop-blur backdrop-saturate-150 ">
+            <div className="flex flex-col w-screen min-h-screen py-2 px-10 max-md:px-4">
+                <div className="sticky top-0 z-10 flex items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50/90 dark:bg-slate-950/90  py-4 backdrop-blur backdrop-saturate-150 max-md:px-4">
                     <div className="max-lg:pl-12 flex flex-col gap-2">
                         <p className="text-sm text-slate-500 dark:text-slate-400">{welcomeText}</p>
                         <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">{headerTitle}</h1>

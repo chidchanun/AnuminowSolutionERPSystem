@@ -15,7 +15,6 @@ export default function Sidebar({ sidebarOpen, onLogout, onClose, user }) {
 
   const logoSrc = user?.picture_path || AnuminowLogo
   const permissionRole = user?.permission_role
-  const department = user?.department_name
 
   const isAdmin = permissionRole === 'Admin'
 
@@ -55,9 +54,10 @@ export default function Sidebar({ sidebarOpen, onLogout, onClose, user }) {
             <Image
               src={logoSrc}
               alt="Logo"
-              fill
+              width={100}
+              height={100}
               className="object-contain w-auto h-auto"
-              priority
+              loading='lazy'
             />
           </div>
           <div>

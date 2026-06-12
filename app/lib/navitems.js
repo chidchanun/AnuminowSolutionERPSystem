@@ -71,14 +71,14 @@ export const navItems = [
     {
         label: 'รายงาน',
         icon: FiBarChart2,
-        href: '/dashboard/report',
+        href: '/dashboard/',
         permission: ['Admin', 'Manager'],
     },
 
     {
         label: 'ตั้งค่า',
         icon: FiSettings,
-        href: '/dashboard/setting',
+        href: '/dashboard/',
         permission: ['Admin'],
     },
 ]

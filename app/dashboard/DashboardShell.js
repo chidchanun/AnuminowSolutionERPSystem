@@ -81,25 +81,13 @@ export default function DashboardShell({ children }) {
             const data = await res.json()
             console.error('Logout failed:', data)
         } catch (err) {
-            console.error('Logout error:', err)
+            
         }
     }
 
     useEffect(() => {
         const init = async () => {
             try {
-                // const refreshRes = await fetch(
-                //     '/api/v1/auth/refresh',
-                //     {
-                //         method: 'POST',
-                //         credentials: 'include',
-                //     }
-                // )
-
-                // if (!refreshRes.ok) {
-                //     router.replace('/login')
-                //     return
-                // }
 
                 const userRes = await fetch(
                     '/api/v1/auth/me',
@@ -115,7 +103,6 @@ export default function DashboardShell({ children }) {
                 }
 
                 const userData = await userRes.json()
-                console.log(userData)
                 setUser(userData.user)
             } catch (error) {
                 console.error(error)

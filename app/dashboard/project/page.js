@@ -1,7 +1,8 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
+import ProjectRow from '@/app/components/ProjectRow'
 
 const availableColumns = [
     { id: 'project_code', label: 'รหัสโปรเจ็ก' },
@@ -24,11 +25,6 @@ export default function ProjectPage() {
         'project_end_date',
     ])
 
-    const fixedColumns = [
-        'project_code',
-        'project_name',
-    ]
-
     const toggleColumn = (columnId) => {
         setSelectedColumns((prev) => {
             // ปิดคอลัมน์
@@ -50,23 +46,34 @@ export default function ProjectPage() {
         })
     }
 
-    const filteredProjects = projects.filter((project) => {
+    const filteredProjects = useMemo(() => {
+        return projects.filter((project) => {
+            const matchStatus =
+                statusFilter === 'all'
+                    ? true
+                    : project.status === statusFilter
 
-        const matchStatus =
-            statusFilter === 'all'
-                ? true
-                : project.status === statusFilter
+            const matchSearch =
+                project.project_name
+                    .toLowerCase()
+                    .includes(searchText.toLowerCase()) ||
+                project.project_code
+                    .toLowerCase()
+                    .includes(searchText.toLowerCase())
 
-        const matchSearch =
-            project.project_name
-                .toLowerCase()
-                .includes(searchText.toLowerCase()) ||
-            project.project_code
-                .toLowerCase()
-                .includes(searchText.toLowerCase())
+            return matchStatus && matchSearch
+        })
+    }, [projects, statusFilter, searchText])
 
-        return matchStatus && matchSearch
-    })
+
+    const formatDate = (date) =>
+        date
+            ? new Intl.DateTimeFormat('th-TH', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+            }).format(new Date(date))
+            : '-'
 
     useEffect(() => {
         const fetchProjects = async () => {
@@ -86,23 +93,25 @@ export default function ProjectPage() {
     }, [])
 
 
-    const totalProjects = projects.length
-    console.log(totalProjects)
-    const activeProjects = projects.filter(
-        (item) => item.status === 'active'
-    ).length
+    const stats = projects.reduce(
+        (acc, item) => {
+            acc.total++
 
-    const planningProjects = projects.filter(
-        (item) => item.status === 'planning'
-    ).length
+            if (item.status === 'active') acc.active++
+            if (item.status === 'planning') acc.planning++
+            if (item.status === 'completed') acc.completed++
+            if (item.status === 'cancelled') acc.cancelled++
 
-    const completedProjects = projects.filter(
-        (item) => item.status === 'completed'
-    ).length
-
-    const cancelledProjects = projects.filter(
-        (item) => item.status === 'cancelled'
-    ).length
+            return acc
+        },
+        {
+            total: 0,
+            active: 0,
+            planning: 0,
+            completed: 0,
+            cancelled: 0,
+        }
+    )
 
     const getStatusColor = (status) => {
         switch (status) {
@@ -132,27 +141,27 @@ export default function ProjectPage() {
 
                 <StatCard
                     title="โปรเจกต์ทั้งหมด"
-                    value={totalProjects}
+                    value={stats.active}
                 />
 
                 <StatCard
                     title="กำลังดำเนินการ"
-                    value={activeProjects}
+                    value={stats.active}
                 />
 
                 <StatCard
                     title="วางแผน"
-                    value={planningProjects}
+                    value={stats.planning}
                 />
 
                 <StatCard
                     title="เสร็จสิ้น"
-                    value={completedProjects}
+                    value={stats.completed}
                 />
 
                 <StatCard
                     title="ยกเลิก"
-                    value={cancelledProjects}
+                    value={stats.cancelled}
                 />
 
             </div>
@@ -172,7 +181,8 @@ export default function ProjectPage() {
                     </div>
 
                     <Link
-                        href="/dashboard/project/new"
+                        // href="/dashboard/project/new"
+                        href="/dashboard/project"
                         className="rounded-xl bg-sky-500 text-white px-4 py-2 hover:bg-sky-400"
                     >
                         สร้างโปรเจกต์
@@ -305,15 +315,7 @@ export default function ProjectPage() {
                                         </p>
 
                                         <p className="font-medium">
-                                            {project.start_date
-                                                ? new Date(
-                                                    project.start_date
-                                                ).toLocaleDateString('th-TH', {
-                                                    day: '2-digit',
-                                                    month: '2-digit',
-                                                    year: 'numeric',
-                                                })
-                                                : '-'}
+                                            {formatDate(project.start_date)}
                                         </p>
                                     </div>
                                 )}
@@ -325,22 +327,15 @@ export default function ProjectPage() {
                                         </p>
 
                                         <p className="font-medium">
-                                            {project.end_date
-                                                ? new Date(
-                                                    project.end_date
-                                                ).toLocaleDateString('th-TH', {
-                                                    day: '2-digit',
-                                                    month: '2-digit',
-                                                    year: 'numeric',
-                                                })
-                                                : '-'}
+                                            {formatDate(project.end_date)}
                                         </p>
                                     </div>
                                 )}
                             </div>
 
                             <Link
-                                href={`/dashboard/project/${project.project_id}`}
+                                // href={`/dashboard/project/${project.project_id}`}
+                                href={`/dashboard/project/`}
                                 className="mt-4 inline-flex w-full items-center justify-center rounded-xl bg-sky-500 px-4 py-2 text-white hover:bg-sky-600"
                             >
                                 ดูรายละเอียด
@@ -370,77 +365,12 @@ export default function ProjectPage() {
 
                         <tbody>
                             {filteredProjects.map((project) => (
-                                <tr
+                                <ProjectRow
                                     key={project.project_id}
-                                    className="border-t border-slate-200 dark:border-slate-800"
-                                >
-                                    {selectedColumns.includes('project_code') && (
-                                        <td className="px-4 py-3">
-                                            {project.project_code}
-                                        </td>
-                                    )}
-
-                                    {selectedColumns.includes('project_name') && (
-                                        <td className="px-4 py-3">
-                                            <div className="font-medium">
-                                                {project.project_name}
-                                            </div>
-
-                                            <div className="text-xs text-slate-500">
-                                                {project.description}
-                                            </div>
-                                        </td>
-                                    )}
-
-                                    {selectedColumns.includes('project_status') && (
-                                        <td className="px-4 py-3">
-                                            <span
-                                                className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(
-                                                    project.status
-                                                )}`}
-                                            >
-                                                {project.status}
-                                            </span>
-                                        </td>
-                                    )}
-
-                                    {selectedColumns.includes('project_start_date') && (
-                                        <td className="px-4 py-3">
-                                            {project.start_date
-                                                ? new Date(
-                                                    project.start_date
-                                                ).toLocaleDateString('th-TH', {
-                                                    day: '2-digit',
-                                                    month: '2-digit',
-                                                    year: 'numeric',
-                                                })
-                                                : '-'}
-                                        </td>
-                                    )}
-
-                                    {selectedColumns.includes('project_end_date') && (
-                                        <td className="px-4 py-3">
-                                            {project.end_date
-                                                ? new Date(
-                                                    project.end_date
-                                                ).toLocaleDateString('th-TH', {
-                                                    day: '2-digit',
-                                                    month: '2-digit',
-                                                    year: 'numeric',
-                                                })
-                                                : '-'}
-                                        </td>
-                                    )}
-
-                                    <td className="px-4 py-3 text-center">
-                                        <Link
-                                            href={`/dashboard/project/${project.project_id}`}
-                                            className="text-sky-600 hover:underline"
-                                        >
-                                            ดูรายละเอียด
-                                        </Link>
-                                    </td>
-                                </tr>
+                                    project={project}
+                                    selectedColumns={selectedColumns}
+                                    getStatusColor={getStatusColor}
+                                />
                             ))}
                         </tbody>
 

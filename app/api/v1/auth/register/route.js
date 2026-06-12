@@ -12,12 +12,7 @@ export async function POST(request) {
             return NextResponse.json({ message: 'โปรดเข้าสู่ระบบก่อน' }, { status: 401 })
         }
 
-        const [userRows] = await db.query(
-            `
-                SELECT 
-                    us.token
-            `
-        )
+        
 
         // อ่านข้อมูล JSON payload จาก request
         const body = await request.json()
@@ -95,7 +90,8 @@ export async function POST(request) {
 
         // ส่ง response ยืนยันว่าผู้ใช้ถูกสร้างเรียบร้อยแล้ว
         return NextResponse.json({ message: 'รหัสผู้ใช้สร้างแล้ว' }, { status: 200 })
-    } catch {
+    } catch (e) {
+        console.log(e)
         return NextResponse.json({ message: 'Internal Server Error' }, { status: 500 })
     }
 }

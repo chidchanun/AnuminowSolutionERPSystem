@@ -199,7 +199,7 @@ export default function CreateEmployeeForm() {
             <div className="flex flex-col w-full h-full rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 shadow-sm transition-colors">
                 <div className=" flex items-center justify-between gap-4 rounded-4xl border border-none dark:border-slate-800 bg-white dark:bg-slate-900  px-6 py-5 max-md:px-2">
                     <div>
-                        <h1 className=" text-2xl font-semibold text-slate-900 dark:text-slate-100 max-md:text-xl max-sm:text-md">ฟอร์มเพิ่มพนักงานใหม่</h1>
+                        <h1 className=" text-2xl font-semibold text-slate-900 dark:text-slate-100 max-md:text-lg max-sm:text-md">เพิ่มพนักงานใหม่</h1>
                     </div>
 
                 </div>

@@ -14,6 +14,19 @@ jobs:
 
       - name: Install
         run: npm ci
+      
+      - name: Create .env
+        run: |
+          cat > .env << EOF
+          JWT_SECRET=${{ secrets.JWT_SECRET }}
+          MYSQL_HOST=${{ secrets.MYSQL_HOST }}
+          MYSQL_HOST_LOCAL=${{ secrets.MYSQL_HOST_LOCAL }}
+          MYSQL_PORT=${{secrets.MYSQL_PORT}}
+          MYSQL_USER=${{ secrets.MYSQL_USER }}
+          MYSQL_PASSWORD=${{ secrets.MYSQL_PASSWORD }}
+          MYSQL_DATABASE=${{ secrets.MYSQL_DATABASE }}
+          MYSQL_ONLINE=${{ secrets.MYSQL_ONLINE }}
+          EOF
 
       - name: Build
         run: npm run build

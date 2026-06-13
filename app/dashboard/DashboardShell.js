@@ -14,12 +14,20 @@ const getHeaderTitle = (pathname) => {
         return 'Dashboard'
     }
 
+    if (normalized.startsWith('/dashboard/employee/new')) {
+        return 'Create Employee'
+    }
+
     if (normalized.startsWith('/dashboard/employee')) {
         return 'Employee Dashboard'
     }
 
-    if (normalized.startsWith('/dashboard/employee/new')) {
-        return 'Create Employee'
+    if (normalized.startsWith('/dashboard/project/new')) {
+        return 'Create Project'
+    }
+
+    if (normalized.startsWith('/dashboard/project')) {
+        return 'Project Dashboard'
     }
 
     if (normalized.startsWith('/dashboard/task')) {
@@ -48,6 +56,10 @@ const getWelcomeText = (pathname) => {
 
     if (normalized.startsWith('/dashboard/employee')) {
         return 'ระบบข้อมูลพนักงาน'
+    }
+
+    if (normalized.startsWith('/dashboard/project')) {
+        return 'ระบบข้อมูลโปรเจ็ก'
     }
 
     if (normalized.startsWith('/dashboard/task')) {
@@ -81,7 +93,7 @@ export default function DashboardShell({ children }) {
             const data = await res.json()
             console.error('Logout failed:', data)
         } catch (err) {
-            
+
         }
     }
 
@@ -114,7 +126,7 @@ export default function DashboardShell({ children }) {
 
         init()
     }, [router])
-    
+
     return (
         <div className="flex bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 ">
             <button

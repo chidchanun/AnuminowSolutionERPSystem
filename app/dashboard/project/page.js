@@ -254,7 +254,7 @@ export default function ProjectPage() {
                         </div>
 
                     </label>
-                    <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950">
+                    <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950 max-lg:hidden">
                         <p className="text-sm text-slate-500">เลือกข้อมูลที่จะแสดง</p>
                         <div className="mt-3 grid gap-2 sm:grid-cols-2">
                             {availableColumns.map((column) => (
@@ -334,8 +334,7 @@ export default function ProjectPage() {
                             </div>
 
                             <Link
-                                // href={`/dashboard/project/${project.project_id}`}
-                                href={`/dashboard/project/`}
+                                href={`/dashboard/project/${project.project_id}`}
                                 className="mt-4 inline-flex w-full items-center justify-center rounded-xl bg-sky-500 px-4 py-2 text-white hover:bg-sky-600"
                             >
                                 ดูรายละเอียด

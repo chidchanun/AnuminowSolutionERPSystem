@@ -64,8 +64,7 @@ function ProjectRow({
 
             <td className="px-4 py-3 text-center">
                 <Link
-                    // href={`/dashboard/project/${project.project_id}`}
-                    href={`/dashboard/project`}
+                    href={`/dashboard/project/${project.project_id}`}
                     className="text-sky-600 hover:underline"
                 >
                     ดูรายละเอียด

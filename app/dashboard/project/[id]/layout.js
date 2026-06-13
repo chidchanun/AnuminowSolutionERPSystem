@@ -1,0 +1,13 @@
+export const metadata = {
+    title: 'รายละเอียดโปรเจ็ก | Anuminow Solution ERP',
+    description: 'ระบบแสดงรายละเอียดของโปรเจ็ก',
+    robots: 'index, follow',
+}
+
+export default function DetailProjectLayout({ children }) {
+    return (
+        <>
+            {children}
+        </>
+    )
+}

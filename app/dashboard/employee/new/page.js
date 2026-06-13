@@ -223,7 +223,7 @@ export default function CreateEmployeeForm() {
                                     name="prefix"
                                     value={form.prefix}
                                     onChange={handleChange}
-                                    className="w-full rounded-3xl border border-slate-400 bg-slate-300 dark:border-slate-800 dark:bg-slate-950 px-4 py-3 pr-12 text-black dark:text-slate-100 outline-none appearance-none focus:border-sky-300 focus:dark:border-sky-500 focus:ring-2 focus:ring-sky-500/20"
+                                    className="w-full rounded-3xl border border-slate-400 bg-slate-200 dark:border-slate-800 dark:bg-slate-950 px-4 py-3 pr-12 text-black dark:text-slate-100 outline-none appearance-none focus:border-sky-300 focus:dark:border-sky-500 focus:ring-2 focus:ring-sky-500/20"
                                 >
                                     <option value="นาย">นาย</option>
                                     <option value="นาง">นาง</option>
@@ -244,7 +244,7 @@ export default function CreateEmployeeForm() {
                                 onChange={handleChange}
                                 type="text"
                                 placeholder="ชื่อภาษาไทย"
-                                className="mt-2 w-full rounded-3xl border border-slate-400 bg-slate-300 dark:border-slate-800 dark:bg-slate-950 text-black dark:text-slate-100 focus:border-sky-300 focus:dark:border-sky-500 px-4 py-3 outline-none focus:ring-2 focus:ring-sky-500/20"
+                                className="mt-2 w-full rounded-3xl border border-slate-400 bg-slate-200 dark:border-slate-800 dark:bg-slate-950 text-black dark:text-slate-100 focus:border-sky-300 focus:dark:border-sky-500 px-4 py-3 outline-none focus:ring-2 focus:ring-sky-500/20"
                                 required
                             />
                         </label>
@@ -256,7 +256,7 @@ export default function CreateEmployeeForm() {
                                 onChange={handleChange}
                                 type="text"
                                 placeholder="นามสกุลภาษาไทย"
-                                className="mt-2 w-full rounded-3xl border border-slate-400 bg-slate-300 dark:border-slate-800 dark:bg-slate-950 text-black dark:text-slate-100 focus:border-sky-300 focus:dark:border-sky-500 px-4 py-3 outline-none focus:ring-2 focus:ring-sky-500/20"
+                                className="mt-2 w-full rounded-3xl border border-slate-400 bg-slate-200 dark:border-slate-800 dark:bg-slate-950 text-black dark:text-slate-100 focus:border-sky-300 focus:dark:border-sky-500 px-4 py-3 outline-none focus:ring-2 focus:ring-sky-500/20"
                                 required
                             />
                         </label>
@@ -271,7 +271,7 @@ export default function CreateEmployeeForm() {
                                 onChange={handleChange}
                                 type="text"
                                 placeholder="ชื่อภาษาอังกฤษ"
-                                className="mt-2 w-full rounded-3xl border border-slate-400 bg-slate-300 dark:border-slate-800 dark:bg-slate-950 text-black dark:text-slate-100 focus:border-sky-300 focus:dark:border-sky-500 px-4 py-3 outline-none focus:ring-2 focus:ring-sky-500/20"
+                                className="mt-2 w-full rounded-3xl border border-slate-400 bg-slate-200 dark:border-slate-800 dark:bg-slate-950 text-black dark:text-slate-100 focus:border-sky-300 focus:dark:border-sky-500 px-4 py-3 outline-none focus:ring-2 focus:ring-sky-500/20"
                                 required
                             />
                         </label>
@@ -283,7 +283,7 @@ export default function CreateEmployeeForm() {
                                 onChange={handleChange}
                                 type="text"
                                 placeholder="นามสกุลภาษาอังกฤษ"
-                                className="mt-2 w-full rounded-3xl border border-slate-400 bg-slate-300 dark:border-slate-800 dark:bg-slate-950 text-black dark:text-slate-100 focus:border-sky-300 focus:dark:border-sky-500 px-4 py-3 outline-none focus:ring-2 focus:ring-sky-500/20"
+                                className="mt-2 w-full rounded-3xl border border-slate-400 bg-slate-200 dark:border-slate-800 dark:bg-slate-950 text-black dark:text-slate-100 focus:border-sky-300 focus:dark:border-sky-500 px-4 py-3 outline-none focus:ring-2 focus:ring-sky-500/20"
                                 required
                             />
                         </label>
@@ -297,7 +297,7 @@ export default function CreateEmployeeForm() {
                                     name="department_id"
                                     value={form.department_id}
                                     onChange={handleChange}
-                                    className="w-full rounded-3xl border border-slate-400 bg-slate-300 dark:border-slate-800 dark:bg-slate-950 px-4 py-3 pr-12 text-black dark:text-slate-100 outline-none appearance-none focus:border-sky-300 focus:dark:border-sky-500 focus:ring-2 focus:ring-sky-500/20"
+                                    className="w-full rounded-3xl border border-slate-400 bg-slate-200 dark:border-slate-800 dark:bg-slate-950 px-4 py-3 pr-12 text-black dark:text-slate-100 outline-none appearance-none focus:border-sky-300 focus:dark:border-sky-500 focus:ring-2 focus:ring-sky-500/20"
                                     required
                                 >
                                     <option value="">เลือกแผนก</option>
@@ -317,7 +317,7 @@ export default function CreateEmployeeForm() {
                                     name="role_id"
                                     value={form.role_id}
                                     onChange={handleChange}
-                                    className="w-full rounded-3xl border border-slate-400 bg-slate-300 dark:border-slate-800 dark:bg-slate-950 px-4 py-3 pr-12 text-black dark:text-slate-100 outline-none appearance-none focus:border-sky-300 focus:dark:border-sky-500 focus:ring-2 focus:ring-sky-500/20"
+                                    className="w-full rounded-3xl border border-slate-400 bg-slate-200 dark:border-slate-800 dark:bg-slate-950 px-4 py-3 pr-12 text-black dark:text-slate-100 outline-none appearance-none focus:border-sky-300 focus:dark:border-sky-500 focus:ring-2 focus:ring-sky-500/20"
                                     disabled={!form.department_id || roles.length === 0}
                                     required
                                 >
@@ -328,7 +328,7 @@ export default function CreateEmployeeForm() {
                                         </option>
                                     ))}
                                 </select>
-                                <FiChevronDown className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                                <FiChevronDown className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-600 dark:text-slate-400" />
                             </div>
                         </label>
                     </div>
@@ -342,7 +342,7 @@ export default function CreateEmployeeForm() {
                                     type="file"
                                     accept="image/*"
                                     onChange={handlePictureChange}
-                                    className="px-2 py-1 w-full rounded-3xl border-slate-400 bg-slate-300 dark:border-slate-800 dark:bg-slate-950 text-black dark:text-slate-100 file:mr-4 file:rounded-full file:border-0 file:bg-sky-500 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-sky-400"
+                                    className="px-2 py-1 w-full rounded-3xl border-slate-400 bg-slate-200 dark:border-slate-800 dark:bg-slate-950 text-black dark:text-slate-100 file:mr-4 file:rounded-full file:border-0 file:bg-sky-500 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-sky-400"
                                 />
                             </div>
                         </label>
@@ -354,7 +354,7 @@ export default function CreateEmployeeForm() {
                                 onChange={handleChange}
                                 type="tel"
                                 placeholder="เบอร์โทรศัพท์"
-                                className="mt-2 w-full rounded-3xl border border-slate-400 bg-slate-300 dark:border-slate-800 dark:bg-slate-950 text-black dark:text-slate-100 focus:border-sky-300 focus:dark:border-sky-500 px-4 py-3 outline-none focus:ring-2 focus:ring-sky-500/20"
+                                className="mt-2 w-full rounded-3xl border border-slate-400 bg-slate-200 dark:border-slate-800 dark:bg-slate-950 text-black dark:text-slate-100 focus:border-sky-300 focus:dark:border-sky-500 px-4 py-3 outline-none focus:ring-2 focus:ring-sky-500/20"
                                 required
                             />
                         </label>
@@ -373,7 +373,7 @@ export default function CreateEmployeeForm() {
                                     onChange={handleChange}
                                     type={showPassword ? 'text' : 'password'}
                                     placeholder="รหัสผ่าน"
-                                    className="mt-0 w-full rounded-3xl border border-slate-400 bg-slate-300 dark:border-slate-800 dark:bg-slate-950 px-4 py-3 pr-12 text-black dark:text-slate-100 outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20"
+                                    className="mt-0 w-full rounded-3xl border border-slate-400 bg-slate-200 dark:border-slate-800 dark:bg-slate-950 px-4 py-3 pr-12 text-black dark:text-slate-100 outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20"
                                     required
                                 />
                                 <button

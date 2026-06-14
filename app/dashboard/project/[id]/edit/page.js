@@ -4,6 +4,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { FiChevronDown } from 'react-icons/fi'
 import TextEditor from '@/app/components/TextEditor'
+import Image from 'next/image'
 
 export default function EditProjectPage() {
     const params = useParams()
@@ -21,42 +22,47 @@ export default function EditProjectPage() {
         status: 'planning',
     })
 
+    const [members, setMembers] = useState([])
+    const [allUsers, setAllUsers] = useState([])
+    const [showMemberModal, setShowMemberModal] = useState(false)
+    const [search, setSearch] = useState('')
+
     useEffect(() => {
-        const fetchProject = async () => {
+        const fetchData = async () => {
             try {
-                const res = await fetch(
-                    `/api/v1/project/${params.id}`
-                )
+                const [projectRes, userRes] = await Promise.all([
+                    fetch(`/api/v1/project/${params.id}`),
+                    fetch('/api/v1/user')
+                ])
 
-                if (!res.ok) return
-
-                const data = await res.json()
+                const projectData = await projectRes.json()
+                const userData = await userRes.json()
 
                 setFormData({
-                    project_name:
-                        data.project.project_name || '',
-                    project_code:
-                        data.project.project_code || '',
-                    description:
-                        data.project.description || '',
+                    project_name: projectData.project.project_name || '',
+                    project_code: projectData.project.project_code || '',
+                    description: projectData.project.description || '',
                     start_date:
-                        data.project.start_date
-                            ?.split('T')[0] || '',
+                        projectData.project.start_date?.split('T')[0] || '',
                     end_date:
-                        data.project.end_date
-                            ?.split('T')[0] || '',
+                        projectData.project.end_date?.split('T')[0] || '',
                     status:
-                        data.project.status || 'planning',
+                        projectData.project.status || 'planning',
                 })
-            } catch (error) {
+
+                setMembers(projectData.members || [])
+                setAllUsers(userData.userData || [])
+            }
+            catch (error) {
                 console.error(error)
-            } finally {
+            }
+            finally {
                 setLoading(false)
             }
         }
 
         if (params.id) {
-            fetchProject()
+            fetchData()
         }
     }, [params.id])
 
@@ -82,7 +88,12 @@ export default function EditProjectPage() {
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify(formData),
+                    body: JSON.stringify({
+                        ...formData,
+                        member_ids: members.map(
+                            (member) => member.id
+                        )
+                    }),
                 }
             )
 
@@ -106,6 +117,30 @@ export default function EditProjectPage() {
         }
     }
 
+    const filteredUsers = allUsers.filter(
+        (user) =>
+            `${user.first_name_th} ${user.last_name_th}`
+                .toLowerCase()
+                .includes(search.toLowerCase())
+    )
+
+
+    const addMember = (user) => {
+        const exists = members.some(
+            (m) => m.id === user.id
+        )
+
+        if (exists) return
+
+        setMembers((prev) => [...prev, user])
+    }
+
+    const removeMember = (id) => {
+        setMembers((prev) =>
+            prev.filter((m) => m.id !== id)
+        )
+    }
+
     if (loading) {
         return (
             <div className="py-6">
@@ -113,6 +148,8 @@ export default function EditProjectPage() {
             </div>
         )
     }
+
+    console.log(members)
 
     return (
         <div className="py-6">
@@ -169,7 +206,7 @@ export default function EditProjectPage() {
                             รายละเอียด
                         </label>
 
-                       
+
 
                         <TextEditor
                             value={formData.description}
@@ -245,7 +282,80 @@ export default function EditProjectPage() {
                         </div>
 
                     </div>
+                    <div>
+                        <div className="flex items-center justify-between mb-3">
+                            <label className="block text-sm font-medium">
+                                สมาชิกโปรเจกต์
+                            </label>
 
+                            <button
+                                type="button"
+                                onClick={() =>
+                                    setShowMemberModal(true)
+                                }
+                                className="px-3 py-2 rounded-xl bg-sky-500 text-white"
+                            >
+                                + เพิ่มสมาชิก
+                            </button>
+                        </div>
+
+                        <div className="space-y-2">
+                            {members.length === 0 && (
+                                <div className="text-slate-500 text-sm">
+                                    ยังไม่มีสมาชิก
+                                </div>
+                            )}
+
+                            {members.map((member) => (
+                                <div
+                                    key={member.id}
+                                    className="rounded-xl border border-slate-200 p-4"
+                                >
+
+                                    <div className="flex items-center justify-between">
+
+                                        <div className='flex justify-center gap-2 items-center'>
+                                            <div className="h-12 w-12 rounded-full bg-slate-300 dark:bg-slate-700 flex items-center justify-center font-semibold">
+                                                {/* {member.full_name?.charAt(0)} */}
+                                                {member.picture_path ?
+                                                    <Image
+                                                        src={member.picture_path}
+                                                        alt="User Profile"
+                                                        width={48}
+                                                        height={48}
+                                                        sizes="48px"
+                                                        className='rounded-full'
+                                                    /> :
+                                                    member.full_name?.charAt(0)
+                                                }
+                                            </div>
+
+                                            <div>
+                                                <p className="font-medium text-black dark:text-white">
+                                                    {member.full_name}
+                                                </p>
+
+                                                <p className="text-sm text-slate-500 dark:text-slate-400">
+                                                    {member.role_name}
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        <button
+                                            type="button"
+                                            onClick={() =>
+                                                removeMember(member.id)
+                                            }
+                                            className="text-red-500"
+                                        >
+                                            ลบ
+                                        </button>
+                                    </div>
+
+                                </div>
+                            ))}
+                        </div>
+                    </div>
                     <div className="flex justify-end gap-3">
 
                         <button
@@ -273,7 +383,89 @@ export default function EditProjectPage() {
                 </form>
 
             </div>
+            {
+                showMemberModal && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
 
+                        <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 w-full max-w-2xl">
+
+                            <div className="flex justify-between mb-4">
+                                <h2 className="text-xl font-semibold">
+                                    เพิ่มสมาชิก
+                                </h2>
+
+                                <button
+                                    type="button"
+                                    onClick={() =>
+                                        setShowMemberModal(false)
+                                    }
+                                >
+                                    ✕
+                                </button>
+                            </div>
+
+                            <input
+                                type="text"
+                                placeholder="ค้นหาพนักงาน"
+                                value={search}
+                                onChange={(e) =>
+                                    setSearch(e.target.value)
+                                }
+                                className="w-full border rounded-xl px-4 py-3 mb-4"
+                            />
+
+                            <div className="max-h-96 overflow-y-auto space-y-2">
+
+                                {filteredUsers.map((user) => {
+
+                                    const exists = members.some(
+                                        (m) => m.id === user.id
+                                    )
+
+                                    return (
+                                        <div
+                                            key={user.id}
+                                            className="flex items-center justify-between border rounded-xl p-3"
+                                        >
+                                            <div>
+                                                <div className="font-medium">
+                                                    {user.first_name_th}
+                                                    {' '}
+                                                    {user.last_name_th}
+                                                </div>
+
+                                                <div className="text-sm text-slate-500">
+                                                    {user.role_name}
+                                                </div>
+                                            </div>
+
+                                            <button
+                                                type="button"
+                                                disabled={exists}
+                                                onClick={() =>
+                                                    addMember(user)
+                                                }
+                                                className={`px-3 py-2 rounded-lg text-white ${exists
+                                                    ? 'bg-slate-400'
+                                                    : 'bg-sky-500'
+                                                    }`}
+                                            >
+                                                {
+                                                    exists
+                                                        ? 'เพิ่มแล้ว'
+                                                        : 'เพิ่ม'
+                                                }
+                                            </button>
+                                        </div>
+                                    )
+                                })}
+                            </div>
+
+                        </div>
+
+                    </div>
+                )
+            }
         </div>
     )
 }

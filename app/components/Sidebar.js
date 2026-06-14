@@ -2,12 +2,12 @@
 
 import Image from 'next/image'
 import Link from 'next/link'
-import { useEffect, useState } from 'react'
+import { useState  } from 'react'
 import { usePathname } from 'next/navigation'
 import { FiLogOut, FiX } from 'react-icons/fi'
 import { navItems } from '../lib/navitems'
 import AnuminowLogo from '../../public/AnuminowSolutionLogoNoBG.png'
-
+import { FiChevronDown } from 'react-icons/fi'
 
 export default function Sidebar({ sidebarOpen, onLogout, onClose, user }) {
 
@@ -15,24 +15,29 @@ export default function Sidebar({ sidebarOpen, onLogout, onClose, user }) {
 
   const logoSrc = user?.picture_path || AnuminowLogo
   const permissionRole = user?.permission_role
+  const [openMenus, setOpenMenus] = useState(() => {
+    const initialState = {}
 
-  const isAdmin = permissionRole === 'Admin'
+    navItems.forEach((item) => {
+      if (
+        item.subMenu &&
+        (
+          pathname === item.href ||
+          pathname.startsWith(`${item.href}/`)
+        )
+      ) {
+        initialState[item.label] = true
+      }
+    })
 
-  const canCreateEmployee =
-    permissionRole === 'Admin'
-
-  const canCreateProject =
-    permissionRole === 'Admin' ||
-    permissionRole === 'Manager'
-
-  const canCreateTask =
-    permissionRole === 'Admin' ||
-    permissionRole === 'Manager' ||
-    permissionRole === 'Team Lead'
-
-  const canViewReport =
-    permissionRole === 'Admin' ||
-    permissionRole === 'Manager'
+    return initialState
+  })
+  const toggleMenu = (label) => {
+    setOpenMenus((prev) => ({
+      ...prev,
+      [label]: !prev[label],
+    }))
+  }
 
 
   const hasPermission = (permissions) => {
@@ -41,7 +46,9 @@ export default function Sidebar({ sidebarOpen, onLogout, onClose, user }) {
     return permissions.includes(permissionRole)
   }
 
-
+  const filteredNavItems = navItems.filter((item) =>
+    hasPermission(item.permission)
+  )
 
   return (
     <aside
@@ -57,7 +64,7 @@ export default function Sidebar({ sidebarOpen, onLogout, onClose, user }) {
               width={100}
               height={100}
               className="object-contain w-auto h-auto"
-              loading='lazy'
+              priority
             />
           </div>
           <div>
@@ -77,53 +84,134 @@ export default function Sidebar({ sidebarOpen, onLogout, onClose, user }) {
       </div>
 
       <nav className="space-y-1">
-        {navItems
-          .filter((item) => hasPermission(item.permission))
-          .map((item) => {
-            const Icon = item.icon
-            const activeParent =
-              item.href &&
-              (pathname === item.href || (item.subMenu && pathname.startsWith(`${item.href}/`)))
-            return (
-              <div key={item.label}>
+
+        {filteredNavItems.map((item) => {
+
+          const Icon = item.icon
+
+          const activeParent = item.subMenu
+            ? pathname === item.href ||
+            pathname.startsWith(`${item.href}/`)
+            : pathname === item.href
+
+          const hasSubMenu =
+            item.subMenu?.length > 0
+
+          return (
+            <div key={item.label}>
+
+              {hasSubMenu ? (
+                <button
+                  type="button"
+                  onClick={() =>
+                    toggleMenu(item.label)
+                  }
+                  className={`
+              w-full
+              flex
+              items-center
+              justify-between
+              rounded-2xl
+              px-4
+              py-3
+              text-sm
+              font-medium
+              transition-colors
+              cursor-pointer
+
+              ${activeParent
+                      ? 'bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-100'
+                      : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'
+                    }
+            `}
+                >
+                  <div className="flex items-center gap-3">
+                    <Icon className="h-5 w-5" />
+                    <span>{item.label}</span>
+                  </div>
+
+                  <FiChevronDown
+                    className={`
+                transition-transform
+                ${openMenus[item.label]
+                        ? 'rotate-180'
+                        : ''
+                      }
+              `}
+                  />
+                </button>
+              ) : (
                 <Link
                   href={item.href}
                   onClick={onClose}
-                  className={`w-full inline-flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium transition-colors ${activeParent ? 'bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-100' : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
-                  aria-current={activeParent ? 'page' : undefined}
+                  className={`
+              w-full
+              inline-flex
+              items-center
+              gap-3
+              rounded-2xl
+              px-4
+              py-3
+              text-sm
+              font-medium
+              transition-colors
+
+              ${activeParent
+                      ? 'bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-100'
+                      : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'
+                    }
+            `}
                 >
                   <Icon className="h-5 w-5" />
                   <span>{item.label}</span>
                 </Link>
-                {item.subMenu && activeParent ? (
-                  <div className="mt-2 space-y-1 pl-12 flex gap-1 flex-col">
-                    {item.subMenu
-                      .filter((sub) => {
-                        if (!hasPermission(sub.permission)) {
-                          return false
-                        }
+              )}
 
-                        return true
-                      })
+              {hasSubMenu &&
+                openMenus[item.label] && (
+
+                  <div className="mt-2 flex flex-col gap-1 pl-12">
+
+                    {item.subMenu
+                      .filter((sub) =>
+                        hasPermission(
+                          sub.permission
+                        )
+                      )
                       .map((sub) => {
-                        const activeSub = pathname === sub.href
+
+                        const activeSub =
+                          pathname ===
+                          sub.href
+
                         return (
                           <Link
                             key={sub.label}
                             href={sub.href}
                             onClick={onClose}
-                            className={`block rounded-2xl px-4 py-2 text-sm transition-colors ${activeSub ? 'bg-slate-200 text-slate-900 dark:bg-slate-700 dark:text-slate-100' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
-                            aria-current={activeSub ? 'page' : undefined}
+                            className={`
+                        rounded-2xl
+                        px-4
+                        py-2
+                        text-sm
+                        transition-colors
+
+                        ${activeSub
+                                ? 'bg-slate-200 text-slate-900 dark:bg-slate-700 dark:text-slate-100'
+                                : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+                              }
+                      `}
                           >
                             {sub.label}
                           </Link>
                         )
                       })}
                   </div>
-                ) : null}
-              </div>
-            )
-          })}
+                )}
+
+            </div>
+          )
+        })}
       </nav>
 
       <div className="mt-auto pt-6 border-t border-slate-200 dark:border-slate-800 text-sm text-slate-500 dark:text-slate-400">

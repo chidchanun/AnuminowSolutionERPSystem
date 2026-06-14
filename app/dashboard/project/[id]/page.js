@@ -1,108 +1,103 @@
-'use client'
+import { db } from "@/app/lib/db"
+import { useUser } from "@/app/context/UserContext"
+import { cookies } from 'next/headers'
+import { safeVerifyToken } from '@/app/lib/verifiedToken'
+import Link from "next/link"
+import Image from "next/image"
 
-import Link from 'next/link'
-import { useParams } from 'next/navigation'
-import { useEffect, useState } from 'react'
-import Image from 'next/image'
+function formatDate(date) {
+    if (!date) return '-'
 
-export default function ProjectDetailPage() {
-    const params = useParams()
+    return new Intl.DateTimeFormat('th-TH', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+    }).format(new Date(date))
+}
 
-    const [project, setProject] = useState(null)
-    const [members, setMembers] = useState([])
-    const [loading, setLoading] = useState(true)
+async function getProjcets({ id }) {
+    const [projects] = await db.execute(
+        `
+                SELECT
+                    p.*,
+                    CONCAT(
+                        u.first_name_th,
+                        ' ',
+                        u.last_name_th
+                    ) AS created_name
+                FROM project p
+                INNER JOIN user u
+                    ON p.created_by = u.id
+                WHERE p.project_id = ?
+                AND p.deleted_at IS NULL
+                `,
+        [id]
+    )
 
-    useEffect(() => {
-        const fetchProject = async () => {
-            try {
-                const res = await fetch(
-                    `/api/v1/project/${params.id}`
-                )
-
-                if (!res.ok) return
-
-                const data = await res.json()
-
-                setProject(data.project)
-                setMembers(data.members || [])
-            } catch (error) {
-                console.error(error)
-            } finally {
-                setLoading(false)
-            }
-        }
-
-        if (params.id) {
-            fetchProject()
-        }
-    }, [params.id])
-
-    const getStatusColor = (status) => {
-        switch (status) {
-            case 'active':
-                return 'bg-green-100 text-green-700'
-
-            case 'planning':
-                return 'bg-blue-100 text-blue-700'
-
-            case 'completed':
-                return 'bg-slate-100 text-slate-700'
-
-            case 'cancelled':
-                return 'bg-red-100 text-red-700'
-
-            default:
-                return 'bg-gray-100 text-gray-700'
-        }
-    }
-
-    const getStatusText = (status) => {
-        switch (status) {
-            case 'active':
-                return 'กำลังดำเนินการ'
-
-            case 'planning':
-                return 'วางแผน'
-
-            case 'completed':
-                return 'เสร็จสิ้น'
-
-            case 'cancelled':
-                return 'ยกเลิก'
-
-            default:
-                return status
-        }
-    }
-
-    const formatDate = (date) => {
-        if (!date) return '-'
-
-        return new Date(date).toLocaleDateString(
-            'th-TH',
-            {
-                day: '2-digit',
-                month: '2-digit',
-                year: 'numeric',
-            }
+    if (projects.length === 0) {
+        return NextResponse.json(
+            { message: 'Project not found' },
+            { status: 404 }
         )
     }
 
-    if (loading) {
-        return (
-            <div className="py-6">
-                กำลังโหลดข้อมูล...
-            </div>
-        )
+    const [members] = await db.execute(
+        `
+                SELECT
+                    u.id,
+                    CONCAT(
+                        u.first_name_th,
+                        ' ',
+                        u.last_name_th
+                    ) AS full_name,
+                    r.role_name,
+                    u.picture_path
+                FROM project_member pm
+                INNER JOIN user u
+                    ON pm.user_id = u.id
+                INNER JOIN role r
+                    ON u.role_id = r.role_id
+                WHERE pm.project_id = ?
+                `,
+        [id]
+    )
+
+    return {
+        project: projects[0],
+        members
+    }
+}
+
+export default async function DetailProjectPage({ params }) {
+
+    const { id } = await params
+    const dataProject = await getProjcets({ id })
+    const project = dataProject.project
+    const member = dataProject.members
+
+    const cookieStore = await cookies()
+
+    const token =
+        cookieStore.get('accessToken')?.value
+
+    const user = token
+        ? safeVerifyToken(token)
+        : null
+
+    const STATUS_COLORS = {
+        active: 'bg-green-100 text-green-700',
+        planning: 'bg-blue-100 text-blue-700',
+        completed: 'bg-slate-100 text-slate-700',
+        cancelled: 'bg-red-100 text-red-700',
     }
 
-    if (!project) {
-        return (
-            <div className="py-6">
-                ไม่พบข้อมูลโปรเจกต์
-            </div>
-        )
+    const STATUS_TEXT = {
+        active: 'กำลังดำเนินการ',
+        planning: 'วางแผน',
+        completed: 'เสร็จสิ้น',
+        cancelled: 'ยกเลิก',
     }
+
 
     return (
         <div className="flex flex-col gap-6 py-6">
@@ -129,13 +124,15 @@ export default function ProjectDetailPage() {
                     >
                         กลับ
                     </Link>
+                    {['Admin', 'Manager'].includes(user?.permission_role) && (
+                        <Link
+                            href={`/dashboard/project/${project.project_id}/edit`}
+                            className="px-4 py-2 rounded-xl bg-sky-500 text-white hover:bg-sky-600"
+                        >
+                            แก้ไข
+                        </Link>
+                    )}
 
-                    <Link
-                        href={`/dashboard/project/${project.project_id}/edit`}
-                        className="px-4 py-2 rounded-xl bg-sky-500 text-white hover:bg-sky-600"
-                    >
-                        แก้ไข
-                    </Link>
 
                 </div>
 
@@ -147,7 +144,7 @@ export default function ProjectDetailPage() {
 
                 <StatCard
                     title="สมาชิก"
-                    value={members.length}
+                    value={member.length}
                 />
 
                 <StatCard
@@ -168,9 +165,9 @@ export default function ProjectDetailPage() {
 
                     <div className="mt-5">
                         <span
-                            className={` px-3 py-1 rounded-full font-medium text-lg max-lg:text-[14px] ${getStatusColor(project.status)}`}
+                            className={`px-3 py-1 rounded-full font-medium text-lg max-lg:text-[14px] ${STATUS_COLORS[project.status]}`}
                         >
-                            {getStatusText(project.status)}
+                            {STATUS_TEXT[project.status]}
                         </span>
                     </div>
 
@@ -273,14 +270,14 @@ export default function ProjectDetailPage() {
                     </h2>
 
                     <span className="text-sm text-slate-500 dark:text-slate-400">
-                        {members.length} คน
+                        {member.length} คน
                     </span>
 
                 </div>
 
                 <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
 
-                    {members.map((member) => (
+                    {member.map((member) => (
                         <div
                             key={member.id}
                             className="rounded-xl border border-slate-200 p-4"
@@ -293,9 +290,10 @@ export default function ProjectDetailPage() {
                                     {member.picture_path ?
                                         <Image
                                             src={member.picture_path}
-                                            alt='User Profile'
+                                            alt="User Profile"
                                             width={48}
                                             height={48}
+                                            sizes="48px"
                                             className='rounded-full'
                                         /> :
                                         member.full_name?.charAt(0)
@@ -316,7 +314,6 @@ export default function ProjectDetailPage() {
 
                         </div>
                     ))}
-
                 </div>
 
             </div>

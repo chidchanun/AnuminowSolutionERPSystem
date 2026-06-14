@@ -79,7 +79,7 @@ export async function PUT(
         const token = request.cookies.get('accessToken')?.value
 
         if (!token) {
-            return NextResponse.json({message : 'โปรดเข้าสู่ระบบใหม่อีกครั้ง', status: 401})
+            return NextResponse.json({ message: 'โปรดเข้าสู่ระบบใหม่อีกครั้ง', status: 401 })
         }
 
         const user = safeVerifyToken(token)
@@ -108,7 +108,8 @@ export async function PUT(
             description,
             start_date,
             end_date,
-            status
+            status,
+            member_ids
         } = body
 
         const [exists] = await db.execute(
@@ -128,28 +129,77 @@ export async function PUT(
             )
         }
 
-        await db.execute(
-            `
-            UPDATE project
-            SET
-                project_name = ?,
-                project_code = ?,
-                description = ?,
-                start_date = ?,
-                end_date = ?,
-                status = ?
-            WHERE project_id = ?
-            `,
-            [
-                project_name,
-                project_code,
-                description,
-                start_date,
-                end_date,
-                status,
-                id
-            ]
-        )
+        const connection = await db.getConnection()
+
+        try {
+
+            await connection.beginTransaction()
+
+            await connection.execute(
+                `
+                    UPDATE project
+                    SET
+                        project_name = ?,
+                        project_code = ?,
+                        description = ?,
+                        start_date = ?,
+                        end_date = ?,
+                        status = ?
+                    WHERE project_id = ?
+                `,
+                [
+                    project_name,
+                    project_code,
+                    description,
+                    start_date,
+                    end_date,
+                    status,
+                    id
+                ]
+            )
+
+            await connection.execute(
+                `
+                    DELETE FROM project_member
+                    WHERE project_id = ?
+                `,
+                [id]
+            )
+
+            if (
+                Array.isArray(member_ids) &&
+                member_ids.length > 0
+            ) {
+
+                const values = member_ids.map(
+                    (userId) => [id, userId]
+                )
+
+                await connection.query(
+                    `
+                        INSERT INTO project_member
+                        (
+                            project_id,
+                            user_id
+                        )
+                        VALUES ?
+                    `,
+                    [values]
+                )
+            }
+
+            await connection.commit()
+
+        } catch (error) {
+
+            await connection.rollback()
+            throw error
+
+        } finally {
+
+            connection.release()
+
+        }
 
         return NextResponse.json({
             message: 'Project updated'

@@ -13,9 +13,7 @@ const availableColumns = [
 ]
 
 export default function ProjectPage() {
-    const [projects, setProjects] = useState([])
     const [statusFilter, setStatusFilter] = useState('all')
-
     const [searchText, setSearchText] = useState('')
     const [selectedColumns, setSelectedColumns] = useState([
         'project_code',
@@ -24,6 +22,16 @@ export default function ProjectPage() {
         'project_start_date',
         'project_end_date',
     ])
+
+    const [projects, setProjects] = useState([])
+    const [summary, setSummary] = useState({
+        total: 0,
+        active: 0,
+        planning: 0,
+        completed: 0,
+        cancelled: 0,
+    })
+
 
     const toggleColumn = (columnId) => {
         setSelectedColumns((prev) => {
@@ -75,43 +83,51 @@ export default function ProjectPage() {
             }).format(new Date(date))
             : '-'
 
+    const stripHtml = (html) => {
+        if (!html) return ''
+
+        const doc = new DOMParser().parseFromString(
+            html,
+            'text/html'
+        )
+
+        return doc.body.textContent || ''
+    }
+
     useEffect(() => {
-        const fetchProjects = async () => {
+        const fetchData = async () => {
             try {
-                const res = await fetch('/api/v1/project')
+                const [projectRes, summaryRes] =
+                    await Promise.all([
+                        fetch('/api/v1/project/my-project'),
+                        fetch('/api/v1/project/my-project/summary'),
+                    ])
 
-                if (!res.ok) return
+                if (
+                    !projectRes.ok ||
+                    !summaryRes.ok
+                ) {
+                    return
+                }
 
-                const data = await res.json()
-                setProjects(data.projects || [])
+                const projectData =
+                    await projectRes.json()
+
+                const summaryData =
+                    await summaryRes.json()
+
+                setProjects(
+                    projectData.projects || []
+                )
+                setSummary(summaryData)
             } catch (error) {
                 console.error(error)
             }
         }
 
-        fetchProjects()
+        fetchData()
     }, [])
 
-
-    const stats = projects.reduce(
-        (acc, item) => {
-            acc.total++
-
-            if (item.status === 'active') acc.active++
-            if (item.status === 'planning') acc.planning++
-            if (item.status === 'completed') acc.completed++
-            if (item.status === 'cancelled') acc.cancelled++
-
-            return acc
-        },
-        {
-            total: 0,
-            active: 0,
-            planning: 0,
-            completed: 0,
-            cancelled: 0,
-        }
-    )
 
     const getStatusColor = (status) => {
         switch (status) {
@@ -141,27 +157,27 @@ export default function ProjectPage() {
 
                 <StatCard
                     title="โปรเจกต์ทั้งหมด"
-                    value={stats.active}
+                    value={summary.total}
                 />
 
                 <StatCard
                     title="กำลังดำเนินการ"
-                    value={stats.active}
+                    value={summary.active}
                 />
 
                 <StatCard
                     title="วางแผน"
-                    value={stats.planning}
+                    value={summary.planning}
                 />
 
                 <StatCard
                     title="เสร็จสิ้น"
-                    value={stats.completed}
+                    value={summary.completed}
                 />
 
                 <StatCard
                     title="ยกเลิก"
-                    value={stats.cancelled}
+                    value={summary.cancelled}
                 />
 
             </div>
@@ -302,9 +318,10 @@ export default function ProjectPage() {
                             </div>
 
                             {project.description && (
-                                <p className="mt-3 text-sm text-slate-600 dark:text-slate-400">
-                                    {project.description}
-                                </p>
+                                <div className="text-xs text-slate-500 line-clamp-2">
+                                    {stripHtml(project.description)}
+                                </div>
+
                             )}
 
                             <div className="mt-4 grid grid-cols-2 gap-3 text-sm">

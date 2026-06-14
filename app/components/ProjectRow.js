@@ -7,14 +7,23 @@ function ProjectRow({
     getStatusColor,
 }) {
     const formatDate = (date) =>
-            date
-                ? new Intl.DateTimeFormat('th-TH', {
-                    day: '2-digit',
-                    month: '2-digit',
-                    year: 'numeric',
-                }).format(new Date(date))
-                : '-'
-    
+        date
+            ? new Intl.DateTimeFormat('th-TH', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+            }).format(new Date(date))
+            : '-'
+    const stripHtml = (html) => {
+        if (!html) return ''
+
+        const doc = new DOMParser().parseFromString(
+            html,
+            'text/html'
+        )
+
+        return doc.body.textContent || ''
+    }
     return (
         <tr className="border-t border-slate-200 dark:border-slate-800">
             {selectedColumns.includes('project_code') && (
@@ -29,8 +38,8 @@ function ProjectRow({
                         {project.project_name}
                     </div>
 
-                    <div className="text-xs text-slate-500">
-                        {project.description}
+                    <div className="text-xs text-slate-500 line-clamp-2">
+                        {stripHtml(project.description)}
                     </div>
                 </td>
             )}

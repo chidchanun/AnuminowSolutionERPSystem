@@ -59,23 +59,7 @@ export default function LoginPage() {
         }
     }
 
-    useEffect(() => {
-        const RequestCheckLogin = async () => {
-            try {
-                const res = await fetch('/api/v1/auth/me', {
-                    method: 'GET',
-                    credentials: 'include'
-                })
-                if (res.ok) {
-                    router.push('/dashboard')
-                    router.refresh()
-                }
-            } catch (error) {
-
-            }
-        }
-        RequestCheckLogin()
-    }, [router])
+    
 
     return (
         <main className="min-h-screen flex items-center justify-center bg-linear-to-br

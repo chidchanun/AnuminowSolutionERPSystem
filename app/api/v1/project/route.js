@@ -2,42 +2,102 @@ import { NextResponse } from 'next/server'
 import { db } from '@/app/lib/db'
 import { safeVerifyToken } from '@/app/lib/verifiedToken'
 
-export async function GET() {
+export async function GET(request) {
     try {
-        const [projects] = await db.execute(`
-      SELECT
-        p.project_id,
-        p.project_code,
-        p.project_name,
-        p.description,
-        p.start_date,
-        p.end_date,
-        p.status,
-        p.created_at,
+        const accessToken =
+            request.cookies.get('accessToken')?.value
 
-        u.first_name_th,
-        u.last_name_th
+        if (!accessToken) {
+            return NextResponse.json(
+                { message: 'Unauthorized' },
+                { status: 401 }
+            )
+        }
 
-      FROM project p
-      INNER JOIN user u
-        ON p.created_by = u.id
+        const payload =
+            safeVerifyToken(accessToken)
 
-      WHERE p.deleted_at IS NULL
+        if (!payload) {
+            return NextResponse.json(
+                { message: 'Unauthorized' },
+                { status: 401 }
+            )
+        }
 
-      ORDER BY p.project_id DESC
-    `)
+        let sql = ''
+        let params = []
 
-        return NextResponse.json({message : "ok" , status : 200, projects})
+        if (
+            ['Admin', 'Manager'].includes(
+                payload.permission_role
+            )
+        ) {
+            sql = `
+                SELECT
+                    p.project_id,
+                    p.project_code,
+                    p.project_name,
+                    p.description,
+                    p.start_date,
+                    p.end_date,
+                    p.status,
+                    p.created_at,
+                    u.first_name_th,
+                    u.last_name_th
+                FROM project p
+                INNER JOIN user u
+                    ON p.created_by = u.id
+                WHERE p.deleted_at IS NULL
+                ORDER BY p.project_id DESC
+            `
+        } else {
+            sql = `
+                SELECT
+                    p.project_id,
+                    p.project_code,
+                    p.project_name,
+                    p.description,
+                    p.start_date,
+                    p.end_date,
+                    p.status,
+                    p.created_at,
+                    u.first_name_th,
+                    u.last_name_th
+                FROM project p
+                INNER JOIN user u
+                    ON p.created_by = u.id
+                INNER JOIN project_member pm
+                    ON p.project_id = pm.project_id
+                WHERE
+                    p.deleted_at IS NULL
+                    AND pm.user_id = ?
+                ORDER BY p.project_id DESC
+            `
+
+            params = [payload.id]
+        }
+
+        const [projects] =
+            await db.execute(sql, params)
+
+        return NextResponse.json({
+            message: 'ok',
+            status: 200,
+            projects,
+        })
     } catch (error) {
         console.error(error)
 
         return NextResponse.json(
-            { message: 'Internal Server Error' },
-            { status: 500 }
+            {
+                message: 'Internal Server Error',
+            },
+            {
+                status: 500,
+            }
         )
     }
 }
-
 
 
 export async function POST(request) {
@@ -98,23 +158,26 @@ export async function POST(request) {
 
         const projectId = result.insertId
 
-        if (member_ids.length > 0) {
-            const values = member_ids.map(
-                (userId) => [projectId, userId]
-            )
+        const memberSet = new Set([
+            payload.id,
+            ...member_ids
+        ])
 
-            await db.query(
-                `
-        INSERT INTO project_member
-        (
-          project_id,
-          user_id
+        const values = [...memberSet].map(
+            userId => [projectId, userId]
         )
-        VALUES ?
-        `,
-                [values]
+
+        await db.query(
+            `
+            INSERT INTO project_member
+            (
+                project_id,
+                user_id
             )
-        }
+            VALUES ?
+            `,
+            [values]
+        )
 
         return NextResponse.json({
             success: true,

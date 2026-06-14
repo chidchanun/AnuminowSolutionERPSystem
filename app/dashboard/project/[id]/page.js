@@ -294,7 +294,7 @@ export default async function DetailProjectPage({ params }) {
                                             width={48}
                                             height={48}
                                             sizes="48px"
-                                            className='rounded-full object-fill'
+                                            className='rounded-full w-12 h-12'
                                         /> :
                                         member.full_name?.charAt(0)
                                     }

@@ -10,6 +10,7 @@ export default function EditProjectPage() {
     const params = useParams()
     const router = useRouter()
 
+    const [showSuccess, setShowSuccess] = useState(false)
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
 
@@ -104,11 +105,8 @@ export default function EditProjectPage() {
                 return
             }
 
-            alert('แก้ไขโปรเจกต์สำเร็จ')
+            setShowSuccess(true)
 
-            router.push(
-                `/dashboard/project/${params.id}`
-            )
         } catch (error) {
             console.error(error)
             alert('เกิดข้อผิดพลาด')
@@ -149,7 +147,6 @@ export default function EditProjectPage() {
         )
     }
 
-    console.log(members)
 
     return (
         <div className="py-6">
@@ -459,6 +456,63 @@ export default function EditProjectPage() {
                                         </div>
                                     )
                                 })}
+                            </div>
+
+                        </div>
+
+                    </div>
+                )
+            }
+            {
+                showSuccess && (
+                    <div className="fixed inset-0 z-999 flex items-center justify-center bg-black/50">
+
+                        <div className="w-full max-w-md rounded-3xl bg-white dark:bg-slate-900 p-8 shadow-2xl">
+
+                            <div className="flex justify-center mb-5">
+
+                                <div className="flex h-20 w-20 items-center justify-center rounded-full bg-green-100">
+
+                                    <svg
+                                        xmlns="http://www.w3.org/2000/svg"
+                                        className="h-10 w-10 text-green-600"
+                                        fill="none"
+                                        viewBox="0 0 24 24"
+                                        stroke="currentColor"
+                                    >
+                                        <path
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            strokeWidth={3}
+                                            d="M5 13l4 4L19 7"
+                                        />
+                                    </svg>
+
+                                </div>
+
+                            </div>
+
+                            <h2 className="text-center text-2xl font-bold text-slate-900 dark:text-white">
+                                บันทึกสำเร็จ
+                            </h2>
+
+                            <p className="mt-3 text-center text-slate-500">
+                                ข้อมูลโปรเจกต์ถูกบันทึกเรียบร้อยแล้ว
+                            </p>
+
+                            <div className="mt-8 flex gap-3">
+
+                                <button
+                                    onClick={() =>
+                                        router.push(
+                                            `/dashboard/project/${params.id}`
+                                        )
+                                    }
+                                    className="flex-1 rounded-xl bg-sky-500 px-4 py-3 text-white hover:bg-sky-600"
+                                >
+                                    ตกลง
+                                </button>
+
                             </div>
 
                         </div>

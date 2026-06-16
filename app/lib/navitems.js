@@ -1,4 +1,12 @@
-import { FiHome, FiUsers, FiBriefcase, FiBarChart2, FiSettings, FiFolder } from 'react-icons/fi'
+import {
+    FiHome,
+    FiUsers,
+    FiBarChart2,
+    FiSettings,
+    FiFolder,
+    FiCheckSquare,
+    FiCalendar,
+} from 'react-icons/fi'
 
 export const navItems = [
     {
@@ -33,6 +41,17 @@ export const navItems = [
             {
                 label: 'รายการโปรเจกต์',
                 href: '/dashboard/project',
+                permission: ['Admin', 'Manager', 'Team Lead'],
+            },
+            {
+                label: 'โปรเจกต์ของฉัน',
+                href: '/dashboard/project/my-project',
+                permission: ['Admin', 'Manager', 'Team Lead', 'Employee'],
+            },
+            {
+                label: 'Gantt Chart',
+                href: '/dashboard/project/gantt',
+                permission: ['Admin', 'Manager', 'Team Lead', 'Employee'],
             },
             {
                 label: 'สร้างโปรเจกต์',
@@ -44,26 +63,34 @@ export const navItems = [
 
     {
         label: 'งาน',
-        icon: FiBriefcase,
+        icon: FiCheckSquare,
         href: '/dashboard/task',
         permission: ['Admin', 'Manager', 'Team Lead', 'Employee'],
         subMenu: [
             {
-                label: 'รายการงาน',
+                label: 'Dashboard งาน',
                 href: '/dashboard/task',
+                permission: ['Admin', 'Manager', 'Team Lead', 'Employee'],
             },
             {
-                label: 'Kanban Board',
-                href: '/dashboard/task/board',
-            },
-            {
-                label: 'เพิ่มงาน',
-                href: '/dashboard/task/new',
+                label: 'งานทั้งหมด',
+                href: '/dashboard/task/list',
                 permission: ['Admin', 'Manager', 'Team Lead'],
             },
             {
                 label: 'งานของฉัน',
                 href: '/dashboard/task/my-task',
+                permission: ['Admin', 'Manager', 'Team Lead', 'Employee'],
+            },
+            {
+                label: 'Kanban Board',
+                href: '/dashboard/task/board',
+                permission: ['Admin', 'Manager', 'Team Lead', 'Employee'],
+            },
+            {
+                label: 'เพิ่มงาน',
+                href: '/dashboard/task/new',
+                permission: ['Admin', 'Manager', 'Team Lead'],
             },
         ],
     },
@@ -71,14 +98,46 @@ export const navItems = [
     {
         label: 'รายงาน',
         icon: FiBarChart2,
-        href: '/dashboard/',
+        href: '/dashboard/report',
         permission: ['Admin', 'Manager'],
+        subMenu: [
+            {
+                label: 'รายงานภาพรวม',
+                href: '/dashboard/report',
+            },
+            {
+                label: 'รายงานโปรเจกต์',
+                href: '/dashboard/report/project',
+            },
+            {
+                label: 'รายงานงาน',
+                href: '/dashboard/report/task',
+            },
+        ],
     },
 
     {
         label: 'ตั้งค่า',
         icon: FiSettings,
-        href: '/dashboard/',
+        href: '/dashboard/setting',
         permission: ['Admin'],
+        subMenu: [
+            {
+                label: 'ตั้งค่าระบบ',
+                href: '/dashboard/setting',
+            },
+            {
+                label: 'แผนก',
+                href: '/dashboard/setting/department',
+            },
+            {
+                label: 'ตำแหน่ง',
+                href: '/dashboard/setting/role',
+            },
+            {
+                label: 'สิทธิ์ผู้ใช้',
+                href: '/dashboard/setting/permission',
+            },
+        ],
     },
 ]

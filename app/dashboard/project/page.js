@@ -25,11 +25,11 @@ export default function ProjectPage() {
 
     const [projects, setProjects] = useState([])
     const [summary, setSummary] = useState({
-        total: 0,
-        active: 0,
-        planning: 0,
-        completed: 0,
-        cancelled: 0,
+        total_projects: 0,
+        active_projects: 0,
+        planning_projects: 0,
+        completed_projects: 0,
+        cancelled_projects: 0,
     })
 
 
@@ -95,37 +95,58 @@ export default function ProjectPage() {
     }
 
     useEffect(() => {
+        let ignore = false
+        const controller = new AbortController()
+
         const fetchData = async () => {
             try {
-                const [projectRes, summaryRes] =
-                    await Promise.all([
-                        fetch('/api/v1/project/my-project'),
-                        fetch('/api/v1/project/my-project/summary'),
-                    ])
-
-                if (
-                    !projectRes.ok ||
-                    !summaryRes.ok
-                ) {
-                    return
-                }
+                const projectRes = await fetch(
+                    '/api/v1/project/my-project',
+                    {
+                        cache: 'no-store',
+                        signal: controller.signal,
+                    }
+                )
 
                 const projectData =
                     await projectRes.json()
 
-                const summaryData =
-                    await summaryRes.json()
+                if (!projectRes.ok) {
+                    throw new Error(
+                        projectData.error_detail ||
+                        projectData.message ||
+                        'โหลดโปรเจกต์ของฉันไม่สำเร็จ'
+                    )
+                }
 
-                setProjects(
-                    projectData.projects || []
-                )
-                setSummary(summaryData)
+                if (ignore) return
+
+                setProjects(projectData.projects || [])
+                setSummary(projectData.summary || {
+                    total_projects: 0,
+                    active_projects: 0,
+                    planning_projects: 0,
+                    completed_projects: 0,
+                    cancelled_projects: 0,
+                })
             } catch (error) {
+                if (
+                    error.name === 'AbortError' ||
+                    ignore
+                ) {
+                    return
+                }
+
                 console.error(error)
             }
         }
 
         fetchData()
+
+        return () => {
+            ignore = true
+            controller.abort()
+        }
     }, [])
 
 
@@ -157,27 +178,27 @@ export default function ProjectPage() {
 
                 <StatCard
                     title="โปรเจกต์ทั้งหมด"
-                    value={summary.total}
+                    value={summary.total_projects}
                 />
 
                 <StatCard
                     title="กำลังดำเนินการ"
-                    value={summary.active}
+                    value={summary.active_projects}
                 />
 
                 <StatCard
                     title="วางแผน"
-                    value={summary.planning}
+                    value={summary.planning_projects}
                 />
 
                 <StatCard
                     title="เสร็จสิ้น"
-                    value={summary.completed}
+                    value={summary.completed_projects}
                 />
 
                 <StatCard
                     title="ยกเลิก"
-                    value={summary.cancelled}
+                    value={summary.cancelled_projects}
                 />
 
             </div>
@@ -192,18 +213,16 @@ export default function ProjectPage() {
                             รายการโปรเจกต์
                         </h2>
                         <p className="text-sm text-slate-900 dark:text-slate-100">
-                            จัดการโปรเจกต์ทั้งหมดในระบบ
+                            โปรเจกต์ที่คุณสร้างหรือเป็นสมาชิกในโปรเจกต์
                         </p>
                     </div>
 
                     <Link
-                        // href="/dashboard/project/new"
-                        href="/dashboard/project"
+                        href="/dashboard/project/new"
                         className="rounded-xl bg-sky-500 text-white px-4 py-2 hover:bg-sky-400"
                     >
                         สร้างโปรเจกต์
                     </Link>
-
                 </div>
 
 

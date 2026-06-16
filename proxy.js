@@ -38,8 +38,11 @@ export function proxy(request) {
   const payload =
     safeVerifyToken(accessToken)
 
+
   if (!payload) {
-    return NextResponse.next()
+    return NextResponse.redirect(
+      new URL('/login', request.url)
+    )
   }
 
   const userRole =

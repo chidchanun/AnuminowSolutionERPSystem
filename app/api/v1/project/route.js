@@ -101,14 +101,21 @@ export async function GET(request) {
 
 
 export async function POST(request) {
+    let connection
+
     try {
+
         const accessToken =
             request.cookies.get('accessToken')?.value
 
         if (!accessToken) {
             return NextResponse.json(
-                { message: 'โปรดเข้าสู่ระบบใหม่อีกครั้ง' },
-                { status: 401 }
+                {
+                    message: 'โปรดเข้าสู่ระบบใหม่อีกครั้ง'
+                },
+                {
+                    status: 401
+                }
             )
         }
 
@@ -117,8 +124,12 @@ export async function POST(request) {
 
         if (!payload) {
             return NextResponse.json(
-                { message: 'โปรดเข้าสู่ระบบใหม่อีกครั้ง' },
-                { status: 401 }
+                {
+                    message: 'โปรดเข้าสู่ระบบใหม่อีกครั้ง'
+                },
+                {
+                    status: 401
+                }
             )
         }
 
@@ -130,70 +141,141 @@ export async function POST(request) {
             description,
             start_date,
             end_date,
+            status = 'planning',
             member_ids = []
         } = body
 
-        const [result] = await db.execute(
+        if (
+            !project_name ||
+            !project_code
+        ) {
+            return NextResponse.json(
+                {
+                    message: 'กรุณากรอกข้อมูลให้ครบถ้วน'
+                },
+                {
+                    status: 400
+                }
+            )
+        }
+
+        const [exists] = await db.execute(
             `
-      INSERT INTO project
-      (
-        project_name,
-        project_code,
-        description,
-        start_date,
-        end_date,
-        created_by
-      )
-      VALUES (?, ?, ?, ?, ?, ?)
-      `,
-            [
-                project_name,
-                project_code,
-                description,
-                start_date,
-                end_date,
-                payload.id
-            ]
+            SELECT project_id
+            FROM project
+            WHERE project_code = ?
+            AND deleted_at IS NULL
+            `,
+            [project_code]
         )
 
-        const projectId = result.insertId
+        if (exists.length > 0) {
+            return NextResponse.json(
+                {
+                    message:
+                        'รหัสโปรเจกต์นี้ถูกใช้งานแล้ว'
+                },
+                {
+                    status: 400
+                }
+            )
+        }
+
+        connection =
+            await db.getConnection()
+
+        await connection.beginTransaction()
+
+        const [result] =
+            await connection.execute(
+                `
+                INSERT INTO project
+                (
+                    project_name,
+                    project_code,
+                    description,
+                    start_date,
+                    end_date,
+                    status,
+                    created_by
+                )
+                VALUES
+                (?, ?, ?, ?, ?, ?, ?)
+                `,
+                [
+                    project_name,
+                    project_code,
+                    description,
+                    start_date || null,
+                    end_date || null,
+                    status,
+                    payload.id
+                ]
+            )
+
+        const projectId =
+            result.insertId
 
         const memberSet = new Set([
             payload.id,
-            ...member_ids
+            ...(member_ids || [])
         ])
 
-        const values = [...memberSet].map(
-            userId => [projectId, userId]
-        )
-
-        await db.query(
-            `
-            INSERT INTO project_member
-            (
-                project_id,
-                user_id
+        const values =
+            [...memberSet].map(
+                (userId) => [
+                    projectId,
+                    userId
+                ]
             )
-            VALUES ?
-            `,
-            [values]
-        )
+
+        if (values.length > 0) {
+            await connection.query(
+                `
+                INSERT INTO project_member
+                (
+                    project_id,
+                    user_id
+                )
+                VALUES ?
+                `,
+                [values]
+            )
+        }
+
+        await connection.commit()
 
         return NextResponse.json({
             success: true,
-            project_id: projectId
+            project_id: projectId,
+            message:
+                'สร้างโปรเจกต์สำเร็จ'
         })
+
     } catch (error) {
+
+        if (connection) {
+            await connection.rollback()
+        }
+
         console.error(error)
 
         return NextResponse.json(
             {
                 success: false,
-                message: 'สร้างโปรเจ็กไม่สำเร็จ'
+                message:
+                    'สร้างโปรเจกต์ไม่สำเร็จ'
             },
             {
                 status: 500
             }
         )
+
+    } finally {
+
+        if (connection) {
+            connection.release()
+        }
+
     }
 }

@@ -12,6 +12,7 @@ export async function GET(request) {
         const [employee] = await db.query(
             `
                 SELECT
+                    u.id,
                     u.prefix,
                     u.first_name_th,
                     u.last_name_th,

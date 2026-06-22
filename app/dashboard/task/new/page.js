@@ -140,9 +140,15 @@ export default function CreateTaskPage() {
 
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
+    const [submitting, setSubmitting] = useState(false)
     const [error, setError] = useState('')
     const [showSuccess, setShowSuccess] = useState(false)
     const [createdTaskId, setCreatedTaskId] = useState(null)
+    const [selectedFiles, setSelectedFiles] = useState([])
+    const handleFileChange = (e) => {
+        const files = Array.from(e.target.files || [])
+        setSelectedFiles(files)
+    }
 
     useEffect(() => {
         let ignore = false
@@ -289,25 +295,59 @@ export default function CreateTaskPage() {
             prev.filter((member) => member.id !== id)
         )
     }
+    const uploadAttachments = async (taskId) => {
+        if (!selectedFiles.length) return
+
+        for (const file of selectedFiles) {
+            const formData = new FormData()
+            formData.append('file', file)
+
+            const res = await fetch(
+                `/api/v1/task/${taskId}/attachment`,
+                {
+                    method: 'POST',
+                    body: formData,
+                }
+            )
+
+            const data = await res.json()
+
+            if (!res.ok) {
+                throw new Error(
+                    data.error_detail ||
+                    data.message ||
+                    `อัปโหลดไฟล์ ${file.name} ไม่สำเร็จ`
+                )
+            }
+        }
+    }
 
     const handleSubmit = async (e) => {
         e.preventDefault()
 
         try {
-            setSaving(true)
+            setSubmitting(true)
             setError('')
+
+            const assigneeIds =
+                assignees
+                    .map((member) => member.id)
+                    .filter(Boolean)
+                    .map((id) => String(id))
+
+            const payload = {
+                ...formData,
+                assignee_ids: assigneeIds,
+            }
+
+            console.log('Create task payload:', payload)
 
             const res = await fetch('/api/v1/task', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({
-                    ...formData,
-                    assignee_ids: assignees.map(
-                        (member) => member.id
-                    ),
-                }),
+                body: JSON.stringify(payload),
             })
 
             const data = await res.json()
@@ -320,13 +360,20 @@ export default function CreateTaskPage() {
                 )
             }
 
-            setCreatedTaskId(data.task_id)
-            setShowSuccess(true)
+            const newTaskId = data.task_id
+
+            if (!newTaskId) {
+                throw new Error('ไม่พบ task_id หลังสร้างงาน')
+            }
+
+            await uploadAttachments(newTaskId)
+
+            router.push(`/dashboard/task/${newTaskId}`)
         } catch (error) {
             console.error(error)
             setError(error.message)
         } finally {
-            setSaving(false)
+            setSubmitting(false)
         }
     }
 
@@ -519,6 +566,47 @@ export default function CreateTaskPage() {
                             }
                         />
                     </div>
+                    <div>
+                        <label className="mb-2 block text-sm font-medium">
+                            ไฟล์แนบ
+                        </label>
+
+                        <input
+                            type="file"
+                            multiple
+                            onChange={handleFileChange}
+                            className="
+                                w-full rounded-xl border border-slate-300 bg-white
+                                px-3 py-2 text-sm
+                                dark:border-slate-700 dark:bg-slate-950
+                            "
+                            accept="
+                                image/jpeg,
+                                image/png,
+                                image/webp,
+                                image/gif,
+                                application/pdf,
+                                text/plain,
+                                application/zip,
+                                application/vnd.openxmlformats-officedocument.wordprocessingml.document,
+                                application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,
+                                application/vnd.openxmlformats-officedocument.presentationml.presentation
+                            "
+                        />
+
+                        {selectedFiles.length > 0 && (
+                            <div className="mt-3 space-y-2">
+                                {selectedFiles.map((file, index) => (
+                                    <div
+                                        key={`${file.name}-${index}`}
+                                        className="rounded-xl bg-slate-50 px-3 py-2 text-sm text-slate-600 dark:bg-slate-800 dark:text-slate-300"
+                                    >
+                                        {file.name}
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
 
                     <div className="rounded-2xl border border-slate-200 p-4 dark:border-slate-800">
 
@@ -599,6 +687,7 @@ export default function CreateTaskPage() {
                             )}
                         </div>
 
+
                     </div>
 
                     <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
@@ -638,6 +727,7 @@ export default function CreateTaskPage() {
                         </button>
 
                     </div>
+
                 </form>
 
             </div>

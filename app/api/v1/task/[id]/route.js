@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/app/lib/db'
 import { safeVerifyToken } from '@/app/lib/verifiedToken'
+import { createNotifications } from '@/app/lib/notification'
+import { emitNotificationToUsers } from '@/app/lib/socketEmit'
 
 export const dynamic = 'force-dynamic'
 
@@ -206,6 +208,21 @@ export async function GET(request, context) {
 
         const canEdit =
             ['Admin', 'Manager', 'Team Lead'].includes(role)
+
+        const canDelete =
+            ['Admin', 'Manager', 'Team Lead'].includes(role)
+
+        return NextResponse.json({
+            success: true,
+            task,
+            assignees: assigneeRows,
+            histories: historyRows,
+            permission: {
+                role,
+                can_edit: canEdit,
+                can_delete: canDelete,
+            },
+        })
 
         return NextResponse.json({
             success: true,
@@ -569,7 +586,11 @@ export async function PUT(request, context) {
 
         const oldSet = new Set(oldAssigneeIds)
         const newSet = new Set(newAssigneeIds)
-
+        const addedAssigneeIds =
+            newAssigneeIds.filter(
+                (newUserId) => !oldSet.has(newUserId)
+            )
+        const notificationTargetUserIds = []
         for (const oldUserId of oldSet) {
             if (!newSet.has(oldUserId)) {
                 historyValues.push([
@@ -628,6 +649,53 @@ export async function PUT(request, context) {
             )
         }
 
+        if (addedAssigneeIds.length > 0) {
+            const assignTargetUserIds =
+                addedAssigneeIds.filter(
+                    (assignedUserId) =>
+                        String(assignedUserId) !== String(userId)
+                )
+
+            await createNotifications({
+                connection,
+                userIds: assignTargetUserIds,
+                type: 'task_assigned',
+                title: 'คุณถูกมอบหมายงานใหม่',
+                message: `คุณถูกมอบหมายงาน: ${task_name}`,
+                link: `/dashboard/task/${taskId}`,
+                sourceTable: 'task',
+                sourceId: taskId,
+                createdBy: userId,
+            })
+
+            notificationTargetUserIds.push(...assignTargetUserIds)
+        }
+
+        if (oldTask.status !== status) {
+            const statusTargetUserIds = [
+                oldTask.created_by,
+                ...newAssigneeIds,
+            ].filter(
+                (targetUserId) =>
+                    targetUserId &&
+                    String(targetUserId) !== String(userId)
+            )
+
+            await createNotifications({
+                connection,
+                userIds: statusTargetUserIds,
+                type: 'task_status_change',
+                title: 'สถานะงานถูกเปลี่ยน',
+                message: `งาน "${task_name}" เปลี่ยนสถานะจาก ${oldTask.status} เป็น ${status}`,
+                link: `/dashboard/task/${taskId}`,
+                sourceTable: 'task',
+                sourceId: taskId,
+                createdBy: userId,
+            })
+
+            notificationTargetUserIds.push(...statusTargetUserIds)
+        }
+
         if (historyValues.length > 0) {
             await connection.query(
                 `
@@ -650,6 +718,8 @@ export async function PUT(request, context) {
 
         await connection.commit()
 
+        await emitNotificationToUsers(notificationTargetUserIds)
+
         return NextResponse.json({
             success: true,
             message: 'แก้ไขงานสำเร็จ',
@@ -666,6 +736,207 @@ export async function PUT(request, context) {
             {
                 success: false,
                 message: 'ไม่สามารถแก้ไขงานได้',
+                error_detail:
+                    process.env.NODE_ENV === 'development'
+                        ? error.message
+                        : undefined,
+            },
+            { status: 500 }
+        )
+    } finally {
+        if (connection) {
+            connection.release()
+        }
+    }
+}
+
+export async function DELETE(request, context) {
+    let connection
+
+    try {
+        const { id } = await context.params
+
+        if (!id || !/^\d+$/.test(String(id))) {
+            return NextResponse.json(
+                {
+                    success: false,
+                    message: 'Task ID ไม่ถูกต้อง',
+                },
+                { status: 400 }
+            )
+        }
+
+        const taskId = Number(id)
+
+        const accessToken =
+            request.cookies.get('accessToken')?.value
+
+        if (!accessToken) {
+            return NextResponse.json(
+                {
+                    success: false,
+                    message: 'กรุณาเข้าสู่ระบบใหม่อีกครั้ง',
+                },
+                { status: 401 }
+            )
+        }
+
+        const payload = await safeVerifyToken(accessToken)
+
+        if (!payload?.id) {
+            return NextResponse.json(
+                {
+                    success: false,
+                    message: 'Token ไม่ถูกต้อง',
+                },
+                { status: 401 }
+            )
+        }
+
+        const userId = payload.id
+        const role = payload.permission_role || 'Employee'
+
+        const canDeleteRole =
+            ['Admin', 'Manager', 'Team Lead'].includes(role)
+
+        if (!canDeleteRole) {
+            return NextResponse.json(
+                {
+                    success: false,
+                    message: 'คุณไม่มีสิทธิ์ลบงาน',
+                },
+                { status: 403 }
+            )
+        }
+
+        const [taskRows] = await db.execute(
+            `
+            SELECT
+                t.task_id,
+                t.task_name,
+                t.project_id,
+                t.created_by,
+                p.project_name
+            FROM task t
+            INNER JOIN project p
+                ON p.project_id = t.project_id
+            WHERE t.task_id = ?
+            AND t.deleted_at IS NULL
+            AND p.deleted_at IS NULL
+            LIMIT 1
+            `,
+            [taskId]
+        )
+
+        const task = taskRows[0]
+
+        if (!task) {
+            return NextResponse.json(
+                {
+                    success: false,
+                    message: 'ไม่พบงานที่ต้องการลบ',
+                },
+                { status: 404 }
+            )
+        }
+
+        if (role === 'Team Lead') {
+            const [accessRows] = await db.execute(
+                `
+                SELECT 1 AS allowed
+                FROM task t
+                WHERE t.task_id = ?
+                AND t.created_by = ?
+
+                UNION
+
+                SELECT 1 AS allowed
+                FROM project_member pm
+                WHERE pm.project_id = ?
+                AND pm.user_id = ?
+
+                UNION
+
+                SELECT 1 AS allowed
+                FROM task_assignment ta
+                WHERE ta.task_id = ?
+                AND ta.user_id = ?
+
+                LIMIT 1
+                `,
+                [
+                    taskId,
+                    userId,
+                    task.project_id,
+                    userId,
+                    taskId,
+                    userId,
+                ]
+            )
+
+            if (accessRows.length === 0) {
+                return NextResponse.json(
+                    {
+                        success: false,
+                        message: 'คุณไม่มีสิทธิ์ลบงานนี้',
+                    },
+                    { status: 403 }
+                )
+            }
+        }
+
+        connection = await db.getConnection()
+        await connection.beginTransaction()
+
+        await connection.execute(
+            `
+            UPDATE task
+            SET deleted_at = CURRENT_TIMESTAMP
+            WHERE task_id = ?
+            AND deleted_at IS NULL
+            `,
+            [taskId]
+        )
+
+        await connection.execute(
+            `
+            INSERT INTO task_history (
+                task_id,
+                target_table,
+                target_column,
+                action_type,
+                old_value,
+                new_value,
+                description,
+                action_by
+            )
+            VALUES (?, 'task', 'deleted_at', 'delete', NULL, 'deleted', ?, ?)
+            `,
+            [
+                taskId,
+                `ลบงาน "${task.task_name}"`,
+                userId,
+            ]
+        )
+
+        await connection.commit()
+
+        return NextResponse.json({
+            success: true,
+            message: 'ลบงานสำเร็จ',
+            task_id: taskId,
+        })
+    } catch (error) {
+        if (connection) {
+            await connection.rollback()
+        }
+
+        console.error('Delete task error:', error)
+
+        return NextResponse.json(
+            {
+                success: false,
+                message: 'ลบงานไม่สำเร็จ',
                 error_detail:
                     process.env.NODE_ENV === 'development'
                         ? error.message

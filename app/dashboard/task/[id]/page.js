@@ -1,17 +1,22 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
 import {
     FiArrowLeft,
     FiEdit,
+    FiTrash2,
     FiCalendar,
     FiUser,
     FiClock,
     FiFolder,
+    FiChevronLeft,
+    FiChevronRight,
 } from 'react-icons/fi'
+import TaskComments from './TaskCommnets'
+import TaskAttachments from './TaskAttachments'
 
 const statusLabel = {
     todo: 'Todo',
@@ -162,16 +167,94 @@ function getHistoryText(history) {
 export default function TaskDetailPage() {
     const params = useParams()
     const router = useRouter()
-
+    const taskId = params.id
     const [task, setTask] = useState(null)
     const [assignees, setAssignees] = useState([])
     const [histories, setHistories] = useState([])
+    const [historyPage, setHistoryPage] = useState(1)
     const [permission, setPermission] = useState({
         can_edit: false,
     })
 
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState('')
+    const [activeTab, setActiveTab] = useState('detail')
+    const tabs = [
+        {
+            id: 'detail',
+            label: 'รายละเอียด',
+        },
+        {
+            id: 'attachment',
+            label: 'ไฟล์แนบ',
+        },
+        {
+            id: 'comment',
+            label: 'Comments',
+        },
+        {
+            id: 'history',
+            label: 'History',
+        },
+    ]
+
+    const HISTORY_PAGE_SIZE = 3
+    const sortedHistories = useMemo(() => {
+        return [...histories].sort((a, b) => {
+            return new Date(b.created_at) - new Date(a.created_at)
+        })
+    }, [histories])
+
+    const totalHistoryPages = Math.max(
+        Math.ceil(sortedHistories.length / HISTORY_PAGE_SIZE),
+        1
+    )
+
+    const pagedHistories = useMemo(() => {
+        const startIndex = (historyPage - 1) * HISTORY_PAGE_SIZE
+        const endIndex = startIndex + HISTORY_PAGE_SIZE
+
+        return sortedHistories.slice(startIndex, endIndex)
+    }, [sortedHistories, historyPage])
+
+    const goPrevHistoryPage = () => {
+        setHistoryPage((prev) => Math.max(prev - 1, 1))
+    }
+
+    const goNextHistoryPage = () => {
+        setHistoryPage((prev) => Math.min(prev + 1, totalHistoryPages))
+    }
+
+    const deleteTask = async () => {
+        const confirmed =
+            window.confirm(`ต้องการลบงาน "${task.task_name}" หรือไม่?`)
+
+        if (!confirmed) return
+
+        try {
+            const res = await fetch(
+                `/api/v1/task/${task.task_id}`,
+                {
+                    method: 'DELETE',
+                }
+            )
+
+            const data = await res.json()
+
+            if (!res.ok) {
+                throw new Error(
+                    data.error_detail ||
+                    data.message ||
+                    'ลบงานไม่สำเร็จ'
+                )
+            }
+
+            router.push('/dashboard/task')
+        } catch (error) {
+            console.error(error)
+            setError(error.message)
+        }
+    }
 
     useEffect(() => {
         let ignore = false
@@ -200,6 +283,7 @@ export default function TaskDetailPage() {
                 setTask(data.task)
                 setAssignees(data.assignees || [])
                 setHistories(data.histories || [])
+                setHistoryPage(1)
                 setPermission(data.permission || {})
                 setError('')
             })
@@ -226,7 +310,7 @@ export default function TaskDetailPage() {
         }
     }, [params.id])
 
-    console.log(assignees)
+
     if (loading) {
         return (
             <div className="py-6">
@@ -306,15 +390,28 @@ export default function TaskDetailPage() {
                         </Link>
                     </div>
 
-                    {permission.can_edit && (
-                        <Link
-                            href={`/dashboard/task/${task.task_id}/edit`}
-                            className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-sky-500 px-4 py-2 text-white hover:bg-sky-600 sm:w-auto"
-                        >
-                            <FiEdit />
-                            แก้ไขงาน
-                        </Link>
-                    )}
+                    <div className="flex flex-col gap-2 sm:flex-row">
+                        {permission.can_edit && (
+                            <Link
+                                href={`/dashboard/task/${task.task_id}/edit`}
+                                className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-sky-500 px-4 py-2 text-white hover:bg-sky-600 sm:w-auto"
+                            >
+                                <FiEdit />
+                                แก้ไขงาน
+                            </Link>
+                        )}
+
+                        {permission.can_delete && (
+                            <button
+                                type="button"
+                                onClick={deleteTask}
+                                className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-red-500 px-4 py-2 text-white hover:bg-red-600 sm:w-auto"
+                            >
+                                <FiTrash2 />
+                                ลบงาน
+                            </button>
+                        )}
+                    </div>
 
                 </div>
 
@@ -345,84 +442,166 @@ export default function TaskDetailPage() {
                     value={task.created_by_name}
                 />
             </div>
-
+            <div className="rounded-2xl border border-slate-200 bg-white p-2 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                <div className="flex flex-wrap gap-2">
+                    {tabs.map((tab) => (
+                        <button
+                            key={tab.id}
+                            type="button"
+                            onClick={() => setActiveTab(tab.id)}
+                            className={`
+                    rounded-xl px-4 py-2 text-sm font-medium transition
+                    ${activeTab === tab.id
+                                    ? 'bg-sky-500 text-white'
+                                    : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'
+                                }
+                `}
+                        >
+                            {tab.label}
+                        </button>
+                    ))}
+                </div>
+            </div>
             <div className="grid gap-6 xl:grid-cols-3">
-
                 <div className="xl:col-span-2 space-y-6">
 
-                    <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-6">
-                        <h2 className="text-lg font-semibold">
-                            รายละเอียดงาน
-                        </h2>
+                    {activeTab === 'detail' && (
+                        <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-6">
+                            <h2 className="text-lg font-semibold">
+                                รายละเอียดงาน
+                            </h2>
 
-                        {task.description ? (
-                            <div
-                                className="
-                                    mt-4 rounded-xl text-slate-700 dark:text-slate-200
-                                    [&_ul]:list-disc [&_ul]:pl-6
-                                    [&_ol]:list-decimal [&_ol]:pl-6
-                                    [&_li]:my-1
-                                "
-                                dangerouslySetInnerHTML={{
-                                    __html: task.description,
-                                }}
-                            />
-                        ) : (
-                            <p className="mt-4 text-sm text-slate-500">
-                                ไม่มีรายละเอียดงาน
-                            </p>
-                        )}
-                    </section>
-
-                    <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-6">
-                        <h2 className="text-lg font-semibold">
-                            ประวัติการทำงาน
-                        </h2>
-
-                        <div className="mt-5 space-y-4">
-                            {histories.length === 0 ? (
-                                <div className="rounded-xl border border-dashed border-slate-300 p-4 text-center text-sm text-slate-500 dark:border-slate-700">
-                                    ยังไม่มีประวัติการทำงาน
-                                </div>
+                            {task.description ? (
+                                <div
+                                    className="
+                            mt-4 rounded-xl text-slate-700 dark:text-slate-200
+                            [&_ul]:list-disc [&_ul]:pl-6
+                            [&_ol]:list-decimal [&_ol]:pl-6
+                            [&_li]:my-1
+                        "
+                                    dangerouslySetInnerHTML={{
+                                        __html: task.description,
+                                    }}
+                                />
                             ) : (
-                                histories.map((history) => (
-                                    <div
-                                        key={history.history_id}
-                                        className="flex gap-3 items-center"
-                                    >
+                                <p className="mt-4 text-sm text-slate-500">
+                                    ไม่มีรายละเอียดงาน
+                                </p>
+                            )}
+                        </section>
+                    )}
 
+                    {activeTab === 'attachment' && (
+                        <TaskAttachments taskId={taskId} />
+                    )}
 
-                                        <div className="min-w-0 flex-1 rounded-xl bg-slate-50 p-3 dark:bg-slate-800 flex flex-row items-center gap-2">
-                                            <UserAvatar
-                                                src={history.action_by_picture}
-                                                name={history.action_by_name}
-                                            />
-                                            <div>
-                                                <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-                                                    <p className="font-medium">
-                                                        {actionLabel[history.action_type] || history.action_type}
+                    {activeTab === 'comment' && (
+                        <TaskComments taskId={taskId} />
+                    )}
+
+                    {activeTab === 'history' && (
+                        <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-6">
+                            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                <div>
+                                    <h2 className="text-lg font-semibold">
+                                        ประวัติการทำงาน
+                                    </h2>
+
+                                    <p className="mt-1 text-sm text-slate-500">
+                                        แสดงล่าสุด {HISTORY_PAGE_SIZE} รายการต่อหน้า
+                                    </p>
+                                </div>
+
+                                {histories.length > 0 && (
+                                    <div className="rounded-full bg-slate-100 px-3 py-1 text-sm text-slate-500 dark:bg-slate-800">
+                                        ทั้งหมด {histories.length} รายการ
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="mt-5 space-y-4">
+                                {histories.length === 0 ? (
+                                    <div className="rounded-xl border border-dashed border-slate-300 p-4 text-center text-sm text-slate-500 dark:border-slate-700">
+                                        ยังไม่มีประวัติการทำงาน
+                                    </div>
+                                ) : (
+                                    pagedHistories.map((history) => (
+                                        <div
+                                            key={history.history_id}
+                                            className="flex gap-3 items-center"
+                                        >
+                                            <div className="min-w-0 flex-1 rounded-xl bg-slate-50 p-3 dark:bg-slate-800 flex flex-row items-center gap-2">
+                                                <UserAvatar
+                                                    src={history.action_by_picture}
+                                                    name={history.action_by_name}
+                                                />
+
+                                                <div className="min-w-0 flex-1">
+                                                    <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                                                        <p className="font-medium">
+                                                            {actionLabel[history.action_type] || history.action_type}
+                                                        </p>
+
+                                                        <p className="text-xs text-slate-500">
+                                                            {formatDateTime(history.created_at)}
+                                                        </p>
+                                                    </div>
+
+                                                    <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+                                                        {getHistoryText(history)}
                                                     </p>
 
-                                                    <p className="text-xs text-slate-500">
-                                                        {formatDateTime(history.created_at)}
+                                                    <p className="mt-2 text-xs text-slate-500">
+                                                        โดย {history.action_by_name}
                                                     </p>
                                                 </div>
-
-                                                <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
-                                                    {getHistoryText(history)}
-                                                </p>
-
-                                                <p className="mt-2 text-xs text-slate-500">
-                                                    โดย {history.action_by_name}
-                                                </p>
                                             </div>
-
                                         </div>
+                                    ))
+                                )}
+                            </div>
+
+                            {histories.length > HISTORY_PAGE_SIZE && (
+                                <div className="mt-5 flex flex-col gap-3 border-t border-slate-200 pt-4 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
+                                    <p className="text-sm text-slate-500">
+                                        หน้า {historyPage} จาก {totalHistoryPages}
+                                    </p>
+
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={goPrevHistoryPage}
+                                            disabled={historyPage <= 1}
+                                            className="
+                                    inline-flex items-center gap-2 rounded-xl
+                                    border border-slate-300 px-3 py-2 text-sm
+                                    hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50
+                                    dark:border-slate-700 dark:hover:bg-slate-800
+                                "
+                                        >
+                                            <FiChevronLeft />
+                                            ก่อนหน้า
+                                        </button>
+
+                                        <button
+                                            type="button"
+                                            onClick={goNextHistoryPage}
+                                            disabled={historyPage >= totalHistoryPages}
+                                            className="
+                                    inline-flex items-center gap-2 rounded-xl
+                                    border border-slate-300 px-3 py-2 text-sm
+                                    hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50
+                                    dark:border-slate-700 dark:hover:bg-slate-800
+                                "
+                                        >
+                                            ถัดไป
+                                            <FiChevronRight />
+                                        </button>
                                     </div>
-                                ))
+                                </div>
                             )}
-                        </div>
-                    </section>
+                        </section>
+                    )}
 
                 </div>
 
@@ -507,7 +686,6 @@ export default function TaskDetailPage() {
                     </section>
 
                 </div>
-
             </div>
 
         </div>

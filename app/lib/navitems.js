@@ -5,7 +5,9 @@ import {
     FiSettings,
     FiFolder,
     FiCheckSquare,
-    FiCalendar,
+    FiBell,
+    FiActivity,
+    FiCalendar
 } from 'react-icons/fi'
 
 export const navItems = [
@@ -13,6 +15,28 @@ export const navItems = [
         label: 'ภาพรวม',
         icon: FiHome,
         href: '/dashboard',
+        permission: ['Admin', 'Manager', 'Team Lead', 'Employee'],
+    },
+
+    {
+        label: 'การแจ้งเตือน',
+        icon: FiBell,
+        href: '/dashboard/notification',
+        permission: ['Admin', 'Manager', 'Team Lead', 'Employee'],
+    },
+
+    {
+        label: 'Activity Log',
+        icon: FiActivity,
+        href: '/dashboard/activity',
+        permission: ['Admin', 'Manager', 'Team Lead'],
+    },
+
+    {
+        label: 'การลา',
+        icon: FiCalendar,
+        href: '/dashboard/leave',
+        permission: ['Admin', 'Manager', 'Team Lead', 'Employee'],
     },
 
     {
@@ -24,10 +48,12 @@ export const navItems = [
             {
                 label: 'ข้อมูลพนักงาน',
                 href: '/dashboard/employee',
+                permission: ['Admin'],
             },
             {
                 label: 'เพิ่มพนักงาน',
                 href: '/dashboard/employee/new',
+                permission: ['Admin'],
             },
         ],
     },
@@ -104,14 +130,7 @@ export const navItems = [
             {
                 label: 'รายงานภาพรวม',
                 href: '/dashboard/report',
-            },
-            {
-                label: 'รายงานโปรเจกต์',
-                href: '/dashboard/report/project',
-            },
-            {
-                label: 'รายงานงาน',
-                href: '/dashboard/report/task',
+                permission: ['Admin', 'Manager'],
             },
         ],
     },
@@ -125,18 +144,22 @@ export const navItems = [
             {
                 label: 'ตั้งค่าระบบ',
                 href: '/dashboard/setting',
+                permission: ['Admin'],
             },
             {
                 label: 'แผนก',
                 href: '/dashboard/setting/department',
+                permission: ['Admin'],
             },
             {
                 label: 'ตำแหน่ง',
                 href: '/dashboard/setting/role',
+                permission: ['Admin'],
             },
             {
                 label: 'สิทธิ์ผู้ใช้',
                 href: '/dashboard/setting/permission',
+                permission: ['Admin'],
             },
         ],
     },

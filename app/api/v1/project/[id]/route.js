@@ -214,44 +214,161 @@ export async function PUT(
     }
 }
 
-export async function DELETE(
-    request,
-    { params }
-) {
-    try {
-        const user = await getCurrentUser()
+export async function DELETE(request, context) {
+    let connection
 
-        if (
-            !['Admin', 'Manager'].includes(
-                user.permission_role
-            )
-        ) {
+    try {
+        const { id } = await context.params
+
+        if (!id || !/^\d+$/.test(String(id))) {
             return NextResponse.json(
-                { message: 'Forbidden' },
+                {
+                    success: false,
+                    message: 'Project ID ไม่ถูกต้อง',
+                },
+                { status: 400 }
+            )
+        }
+
+        const projectId = Number(id)
+
+        const accessToken =
+            request.cookies.get('accessToken')?.value
+
+        if (!accessToken) {
+            return NextResponse.json(
+                {
+                    success: false,
+                    message: 'กรุณาเข้าสู่ระบบใหม่อีกครั้ง',
+                },
+                { status: 401 }
+            )
+        }
+
+        const payload = await safeVerifyToken(accessToken)
+
+        if (!payload?.id) {
+            return NextResponse.json(
+                {
+                    success: false,
+                    message: 'Token ไม่ถูกต้อง',
+                },
+                { status: 401 }
+            )
+        }
+
+        const userId = payload.id
+        const role = payload.permission_role || 'Employee'
+
+        if (!['Admin', 'Manager'].includes(role)) {
+            return NextResponse.json(
+                {
+                    success: false,
+                    message: 'คุณไม่มีสิทธิ์ลบโปรเจกต์',
+                },
                 { status: 403 }
             )
         }
 
-        const { id } = await params
-
-        await db.execute(
+        const [projectRows] = await db.execute(
             `
-                UPDATE project
-                SET deleted_at = NOW()
-                WHERE project_id = ?
+            SELECT
+                project_id,
+                project_name,
+                created_by
+            FROM project
+            WHERE project_id = ?
+            AND deleted_at IS NULL
+            LIMIT 1
             `,
-            [id]
+            [projectId]
         )
+
+        const project = projectRows[0]
+
+        if (!project) {
+            return NextResponse.json(
+                {
+                    success: false,
+                    message: 'ไม่พบโปรเจกต์ที่ต้องการลบ',
+                },
+                { status: 404 }
+            )
+        }
+
+        connection = await db.getConnection()
+        await connection.beginTransaction()
+
+        await connection.execute(
+            `
+            UPDATE project
+            SET deleted_at = CURRENT_TIMESTAMP
+            WHERE project_id = ?
+            AND deleted_at IS NULL
+            `,
+            [projectId]
+        )
+
+        await connection.execute(
+            `
+            INSERT INTO task_history (
+                task_id,
+                target_table,
+                target_column,
+                action_type,
+                old_value,
+                new_value,
+                description,
+                action_by
+            )
+            SELECT
+                t.task_id,
+                'project',
+                'deleted_at',
+                'delete',
+                NULL,
+                'deleted',
+                ?,
+                ?
+            FROM task t
+            WHERE t.project_id = ?
+            AND t.deleted_at IS NULL
+            `,
+            [
+                `ลบโปรเจกต์ "${project.project_name}"`,
+                userId,
+                projectId,
+            ]
+        )
+
+        await connection.commit()
 
         return NextResponse.json({
-            message: 'Project deleted'
+            success: true,
+            message: 'ลบโปรเจกต์สำเร็จ',
+            project_id: projectId,
         })
     } catch (error) {
-        console.error(error)
+        if (connection) {
+            await connection.rollback()
+        }
+
+        console.error('Delete project error:', error)
 
         return NextResponse.json(
-            { message: 'Internal Server Error' },
+            {
+                success: false,
+                message: 'ลบโปรเจกต์ไม่สำเร็จ',
+                error_detail:
+                    process.env.NODE_ENV === 'development'
+                        ? error.message
+                        : undefined,
+            },
             { status: 500 }
         )
+    } finally {
+        if (connection) {
+            connection.release()
+        }
     }
 }

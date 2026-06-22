@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/app/lib/db'
 import { safeVerifyToken } from '@/app/lib/verifiedToken'
+import { createNotifications } from '@/app/lib/notification'
+import { emitNotificationToUsers } from '@/app/lib/socketEmit'
 
 export const dynamic = 'force-dynamic'
 
@@ -691,6 +693,7 @@ export async function POST(request) {
         )
 
         const taskId = result.insertId
+        const notificationTargetUserIds = []
 
         if (cleanAssigneeIds.length > 0) {
             const assignmentValues =
@@ -709,6 +712,28 @@ export async function POST(request) {
                 VALUES ?
                 `,
                 [assignmentValues]
+            )
+
+            await createNotifications({
+                connection,
+                userIds: cleanAssigneeIds.filter(
+                    (assignedUserId) =>
+                        String(assignedUserId) !== String(userId)
+                ),
+                type: 'task_assigned',
+                title: 'คุณถูกมอบหมายงานใหม่',
+                message: `คุณถูกมอบหมายงาน: ${task_name}`,
+                link: `/dashboard/task/${taskId}`,
+                sourceTable: 'task',
+                sourceId: taskId,
+                createdBy: userId,
+            })
+
+            notificationTargetUserIds.push(
+                ...cleanAssigneeIds.filter(
+                    (assignedUserId) =>
+                        String(assignedUserId) !== String(userId)
+                )
             )
         }
 
@@ -770,11 +795,12 @@ export async function POST(request) {
         )
 
         await connection.commit()
-
+        await emitNotificationToUsers(notificationTargetUserIds)
+        
         return NextResponse.json({
             success: true,
             message: 'สร้างงานสำเร็จ',
-            task_id: taskId,
+            task_id: result.insertId,
         })
     } catch (error) {
         if (connection) {

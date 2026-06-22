@@ -58,15 +58,20 @@ export async function GET(request) {
         const week = getWeekStartEnd()
         const today = getTodayISO()
 
+        const selectedDate = searchParams.get('date') || today
         const dateFrom = searchParams.get('from') || week.from
         const dateTo = searchParams.get('to') || week.to
-        const selectedDate = searchParams.get('date') || today
+
         const departmentId = searchParams.get('department_id') || ''
+        const roleId = searchParams.get('role_id') || ''
         const userId = searchParams.get('user_id') || ''
+        const attendanceStatus = searchParams.get('status') || 'all'
 
         const where = [
             'u.deleted_at IS NULL',
+            "u.status = 'active'",
         ]
+
         const values = []
 
         if (!canManageAttendance(user)) {
@@ -77,6 +82,11 @@ export async function GET(request) {
         if (departmentId && /^\d+$/.test(departmentId)) {
             where.push('u.department_id = ?')
             values.push(Number(departmentId))
+        }
+
+        if (roleId && /^\d+$/.test(roleId)) {
+            where.push('u.role_id = ?')
+            values.push(Number(roleId))
         }
 
         if (userId.trim()) {
@@ -138,36 +148,52 @@ export async function GET(request) {
             ]
         )
 
-        const [attendanceRows] = await db.execute(
+        const dailyWhere = [...where]
+        const dailyValues = [...values]
+
+        if (
+            attendanceStatus !== 'all' &&
+            ['present', 'late', 'absent', 'leave'].includes(attendanceStatus)
+        ) {
+            dailyWhere.push("COALESCE(a.status, 'absent') = ?")
+            dailyValues.push(attendanceStatus)
+        }
+
+        const [dailyRows] = await db.execute(
             `
             SELECT
+                u.id AS user_id,
+                CONCAT(u.first_name_th, ' ', u.last_name_th) AS full_name_th,
+                CONCAT(u.first_name_en, ' ', u.last_name_en) AS full_name_en,
+                u.email,
+                u.picture_path,
+                d.department_name,
+                r.role_name,
+
                 a.attendance_id,
-                a.user_id,
-                a.work_date,
+                COALESCE(a.work_date, ?) AS work_date,
                 a.check_in,
                 a.check_out,
-                a.status,
-                a.note,
-                CONCAT(u.first_name_th, ' ', u.last_name_th) AS full_name_th,
-                u.email,
-                d.department_name,
-                r.role_name
-            FROM attendance a
-            INNER JOIN \`user\` u
-                ON u.id = a.user_id
+                DATE_FORMAT(a.check_in, '%H:%i') AS check_in_time,
+                DATE_FORMAT(a.check_out, '%H:%i') AS check_out_time,
+                COALESCE(a.status, 'absent') AS status,
+                a.note
+            FROM \`user\` u
+            LEFT JOIN attendance a
+                ON a.user_id = u.id
+                AND a.work_date = ?
             LEFT JOIN department d
                 ON d.department_id = u.department_id
             LEFT JOIN role r
                 ON r.role_id = u.role_id
-            WHERE a.work_date BETWEEN ? AND ?
-            AND ${userWhereSql}
-            ORDER BY a.work_date DESC, full_name_th ASC
-            LIMIT 300
+            WHERE ${dailyWhere.join(' AND ')}
+            ORDER BY full_name_th ASC
+            LIMIT 500
             `,
             [
-                dateFrom,
-                dateTo,
-                ...values,
+                selectedDate,
+                selectedDate,
+                ...dailyValues,
             ]
         )
 
@@ -180,7 +206,11 @@ export async function GET(request) {
             },
             summary,
             weekly: weeklyRows,
-            attendance: attendanceRows,
+            daily_attendance: dailyRows,
+            attendance: dailyRows,
+            permission: {
+                can_manage: canManageAttendance(user),
+            },
         })
     } catch (error) {
         console.error('Attendance GET error:', error)

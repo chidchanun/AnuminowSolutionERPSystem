@@ -7,7 +7,8 @@ import {
     FiCheckSquare,
     FiBell,
     FiActivity,
-    FiCalendar
+    FiCalendar,
+    FiClock
 } from 'react-icons/fi'
 
 export const navItems = [
@@ -36,6 +37,13 @@ export const navItems = [
         label: 'การลา',
         icon: FiCalendar,
         href: '/dashboard/leave',
+        permission: ['Admin', 'Manager', 'Team Lead', 'Employee'],
+    },
+
+    {
+        label: 'Attendance',
+        icon: FiClock,
+        href: '/dashboard/attendance',
         permission: ['Admin', 'Manager', 'Team Lead', 'Employee'],
     },
 

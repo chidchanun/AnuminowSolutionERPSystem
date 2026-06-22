@@ -33,11 +33,14 @@ export default function LoginPage() {
 
             const res = await fetch('/api/v1/auth/login', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(formData)
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                credentials: 'include',
+                body: JSON.stringify(formData),
             })
 
-            const data = await res.json()
+            const data = await res.json().catch(() => ({}))
 
             if (!res.ok) {
                 setError(data.message || 'เข้าสู่ระบบล้มเหลว')
@@ -45,21 +48,25 @@ export default function LoginPage() {
                 return
             }
 
-            // บันทึก user info ลง localStorage (หรือ context)
             if (data.user) {
                 localStorage.setItem('user', JSON.stringify(data.user))
             }
 
-            // รีไดเรค ไปหน้าแรก
-            router.push('/dashboard')
+            router.replace('/dashboard')
+            router.refresh()
+
+            // fallback สำหรับระบบที่ใช้ cookie + proxy
+            setTimeout(() => {
+                window.location.replace('/dashboard')
+            }, 100)
         } catch (err) {
-            setError('เกิดข้อผิดพลาดในการเชื่อมต่อ กรุณาลองใหม่')
             console.error('Login error:', err)
+            setError('เกิดข้อผิดพลาดในการเชื่อมต่อ กรุณาลองใหม่')
             setLoading(false)
         }
     }
 
-    
+
 
     return (
         <main className="min-h-screen flex items-center justify-center bg-linear-to-br

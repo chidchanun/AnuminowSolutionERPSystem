@@ -7,6 +7,7 @@ import Sidebar from '../components/Sidebar'
 import { UserContext } from '../context/UserContext'
 import NotificationBell from '../components/NotificationBell'
 import { getHeaderTitle, getWelcomeText } from '../lib/HeaderText'
+import DashboardPageGuard from './DashboardPageGuard'
 
 
 export default function DashboardShell({ children, user }) {
@@ -63,7 +64,9 @@ export default function DashboardShell({ children, user }) {
                         </div>
                         <NotificationBell />
                     </div>
-                    {children}
+                    <DashboardPageGuard>
+                        {children}
+                    </DashboardPageGuard>
                 </div>
             </div>
         </UserContext.Provider>

@@ -1,6 +1,11 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/app/lib/db'
-import { safeVerifyToken } from '@/app/lib/verifiedToken'
+import {
+    hasPermissionKey,
+    hasTaskRelatedAccess,
+    hasTaskWideAccess,
+    requirePermission,
+} from '@/app/lib/permission'
 import { createNotifications } from '@/app/lib/notification'
 import { emitNotificationToUsers } from '@/app/lib/socketEmit'
 
@@ -19,40 +24,17 @@ export async function GET(request, context) {
                 { status: 400 }
             )
         }
+        const auth = await requirePermission(
+            request,
+            'task.view'
+        )
 
-        const accessToken =
-            request.cookies.get('accessToken')?.value
+        if (auth.response) return auth.response
 
-        if (!accessToken) {
-            return NextResponse.json(
-                {
-                    success: false,
-                    message: 'กรุณาเข้าสู่ระบบใหม่อีกครั้ง',
-                },
-                { status: 401 }
-            )
-        }
-
-        const payload = safeVerifyToken(accessToken)
-
-        if (!payload?.id) {
-            return NextResponse.json(
-                {
-                    success: false,
-                    message: 'Token ไม่ถูกต้อง',
-                },
-                { status: 401 }
-            )
-        }
-
-        const userId = payload.id
-        const role = payload.permission_role || 'Employee'
-
-        const isAdminScope =
-            ['Admin', 'Manager'].includes(role)
-
-        const isTeamLead =
-            role === 'Team Lead'
+        const user = auth.user
+        const userId = user.id
+        const isAdminScope = hasTaskWideAccess(user)
+        const canViewRelated = hasTaskRelatedAccess(user)
 
         const where = [
             't.task_id = ?',
@@ -62,7 +44,7 @@ export async function GET(request, context) {
 
         const values = [Number(id)]
 
-        if (!isAdminScope && isTeamLead) {
+        if (!isAdminScope && canViewRelated) {
             where.push(`
                 (
                     t.created_by = ?
@@ -84,7 +66,7 @@ export async function GET(request, context) {
             values.push(userId, userId, userId)
         }
 
-        if (!isAdminScope && !isTeamLead) {
+        if (!isAdminScope && !canViewRelated) {
             where.push(`
                 EXISTS (
                     SELECT 1
@@ -206,11 +188,9 @@ export async function GET(request, context) {
             [Number(id)]
         )
 
-        const canEdit =
-            ['Admin', 'Manager', 'Team Lead'].includes(role)
+        const canEdit = hasPermissionKey(user, 'task.update')
 
-        const canDelete =
-            ['Admin', 'Manager', 'Team Lead'].includes(role)
+        const canDelete = hasPermissionKey(user, 'task.delete')
 
         return NextResponse.json({
             success: true,
@@ -218,20 +198,8 @@ export async function GET(request, context) {
             assignees: assigneeRows,
             histories: historyRows,
             permission: {
-                role,
                 can_edit: canEdit,
                 can_delete: canDelete,
-            },
-        })
-
-        return NextResponse.json({
-            success: true,
-            task,
-            assignees: assigneeRows,
-            histories: historyRows,
-            permission: {
-                role,
-                can_edit: canEdit,
             },
         })
     } catch (error) {
@@ -268,47 +236,15 @@ export async function PUT(request, context) {
         }
 
         const taskId = Number(id)
+        const auth = await requirePermission(
+            request,
+            'task.update'
+        )
 
-        const accessToken =
-            request.cookies.get('accessToken')?.value
+        if (auth.response) return auth.response
 
-        if (!accessToken) {
-            return NextResponse.json(
-                {
-                    success: false,
-                    message: 'กรุณาเข้าสู่ระบบใหม่อีกครั้ง',
-                },
-                { status: 401 }
-            )
-        }
-
-        const payload = safeVerifyToken(accessToken)
-
-        if (!payload?.id) {
-            return NextResponse.json(
-                {
-                    success: false,
-                    message: 'Token ไม่ถูกต้อง',
-                },
-                { status: 401 }
-            )
-        }
-
-        const userId = payload.id
-        const role = payload.permission_role || 'Employee'
-
-        const canEditRole =
-            ['Admin', 'Manager', 'Team Lead'].includes(role)
-
-        if (!canEditRole) {
-            return NextResponse.json(
-                {
-                    success: false,
-                    message: 'คุณไม่มีสิทธิ์แก้ไขงาน',
-                },
-                { status: 403 }
-            )
-        }
+        const user = auth.user
+        const userId = user.id
 
         const body = await request.json()
 
@@ -395,7 +331,7 @@ export async function PUT(request, context) {
             )
         }
 
-        if (role === 'Team Lead') {
+        if (!hasTaskWideAccess(user)) {
             const [accessRows] = await db.execute(
                 `
                 SELECT 1 AS allowed
@@ -767,47 +703,15 @@ export async function DELETE(request, context) {
         }
 
         const taskId = Number(id)
+        const auth = await requirePermission(
+            request,
+            'task.delete'
+        )
 
-        const accessToken =
-            request.cookies.get('accessToken')?.value
+        if (auth.response) return auth.response
 
-        if (!accessToken) {
-            return NextResponse.json(
-                {
-                    success: false,
-                    message: 'กรุณาเข้าสู่ระบบใหม่อีกครั้ง',
-                },
-                { status: 401 }
-            )
-        }
-
-        const payload = await safeVerifyToken(accessToken)
-
-        if (!payload?.id) {
-            return NextResponse.json(
-                {
-                    success: false,
-                    message: 'Token ไม่ถูกต้อง',
-                },
-                { status: 401 }
-            )
-        }
-
-        const userId = payload.id
-        const role = payload.permission_role || 'Employee'
-
-        const canDeleteRole =
-            ['Admin', 'Manager', 'Team Lead'].includes(role)
-
-        if (!canDeleteRole) {
-            return NextResponse.json(
-                {
-                    success: false,
-                    message: 'คุณไม่มีสิทธิ์ลบงาน',
-                },
-                { status: 403 }
-            )
-        }
+        const user = auth.user
+        const userId = user.id
 
         const [taskRows] = await db.execute(
             `
@@ -840,7 +744,7 @@ export async function DELETE(request, context) {
             )
         }
 
-        if (role === 'Team Lead') {
+        if (!hasTaskWideAccess(user)) {
             const [accessRows] = await db.execute(
                 `
                 SELECT 1 AS allowed

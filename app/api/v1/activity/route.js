@@ -1,6 +1,10 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/app/lib/db'
-import { safeVerifyToken } from '@/app/lib/verifiedToken'
+import {
+    hasTaskRelatedAccess,
+    hasTaskWideAccess,
+    requirePermission,
+} from '@/app/lib/permission'
 
 export const dynamic = 'force-dynamic'
 
@@ -14,26 +18,6 @@ const validActionTypes = [
     'delete',
 ]
 
-async function getAuthUser(request) {
-    const accessToken =
-        request.cookies.get('accessToken')?.value
-
-    if (!accessToken) {
-        return null
-    }
-
-    const payload = await safeVerifyToken(accessToken)
-
-    if (!payload?.id) {
-        return null
-    }
-
-    return {
-        id: payload.id,
-        role: payload.permission_role || 'Employee',
-    }
-}
-
 function buildActivityWhere({
     user,
     searchParams,
@@ -41,13 +25,12 @@ function buildActivityWhere({
     const where = []
     const values = []
 
-    const role = user.role
     const userId = user.id
 
-    const isAdminScope =
-        ['Admin', 'Manager'].includes(role)
+    const canViewAll = hasTaskWideAccess(user)
+    const canViewRelated = hasTaskRelatedAccess(user)
 
-    if (!isAdminScope && role === 'Team Lead') {
+    if (!canViewAll && canViewRelated) {
         where.push(`
             (
                 t.created_by = ?
@@ -70,7 +53,7 @@ function buildActivityWhere({
         values.push(userId, userId, userId, userId)
     }
 
-    if (!isAdminScope && role !== 'Team Lead') {
+    if (!canViewAll && !canViewRelated) {
         where.push(`
             EXISTS (
                 SELECT 1
@@ -146,18 +129,14 @@ function buildActivityWhere({
 
 export async function GET(request) {
     try {
-        const user =
-            await getAuthUser(request)
+        const auth = await requirePermission(
+            request,
+            'activity.view'
+        )
 
-        if (!user) {
-            return NextResponse.json(
-                {
-                    success: false,
-                    message: 'Unauthorized',
-                },
-                { status: 401 }
-            )
-        }
+        if (auth.response) return auth.response
+
+        const user = auth.user
 
         const { searchParams } =
             new URL(request.url)

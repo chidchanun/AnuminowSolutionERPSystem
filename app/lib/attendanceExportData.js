@@ -1,21 +1,15 @@
 import { db } from '@/app/lib/db'
-import { safeVerifyToken } from '@/app/lib/verifiedToken'
+import {
+    getAuthUserWithPermissions,
+    hasPermissionKey,
+} from '@/app/lib/permission'
 
 export async function getAttendanceExportAuthUser(request) {
-    const accessToken = request.cookies.get('accessToken')?.value
-    if (!accessToken) return null
-
-    const payload = await safeVerifyToken(accessToken)
-    if (!payload?.id) return null
-
-    return {
-        id: payload.id,
-        role: payload.permission_role || 'Employee',
-    }
+    return getAuthUserWithPermissions(request)
 }
 
 export function canExportAttendance(user) {
-    return ['Admin', 'Manager'].includes(user?.role)
+    return hasPermissionKey(user, 'attendance.export')
 }
 
 function getTodayDate() {

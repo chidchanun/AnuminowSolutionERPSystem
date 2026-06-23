@@ -1,29 +1,14 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/app/lib/db'
-import { safeVerifyToken } from '@/app/lib/verifiedToken'
+import {
+    getAuthUserWithPermissions,
+    hasTaskWideAccess,
+} from '@/app/lib/permission'
 import { createNotifications } from '@/app/lib/notification'
 import { emitNotificationToUsers } from '@/app/lib/socketEmit'
-function isAdminRole(role) {
-    return ['Admin', 'Manager'].includes(role)
-}
 
 async function getAuthUser(request) {
-    const token = request.cookies.get('accessToken')?.value
-
-    if (!token) {
-        return null
-    }
-
-    const payload = await safeVerifyToken(token)
-
-    if (!payload) {
-        return null
-    }
-
-    return {
-        id: payload.id,
-        role: payload.permission_role,
-    }
+    return getAuthUserWithPermissions(request)
 }
 
 async function canAccessTask(id, user) {
@@ -31,7 +16,7 @@ async function canAccessTask(id, user) {
         return false
     }
 
-    if (isAdminRole(user.role)) {
+    if (hasTaskWideAccess(user)) {
         const [rows] = await db.execute(
             `
             SELECT task_id
@@ -164,7 +149,7 @@ export async function GET(request, { params }) {
             success: true,
             comments,
             current_user_id: user.id,
-            current_user_role: user.role,
+            current_user_permissions: user.permissions || [],
         })
     } catch (error) {
         console.error('GET Task Comment Error:', error)

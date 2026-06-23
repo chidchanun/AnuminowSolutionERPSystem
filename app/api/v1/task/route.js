@@ -1,9 +1,14 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/app/lib/db'
-import { safeVerifyToken } from '@/app/lib/verifiedToken'
+import {
+    hasTaskRelatedAccess,
+    hasTaskWideAccess,
+    requirePermission,
+} from '@/app/lib/permission'
 import { createNotifications } from '@/app/lib/notification'
 import { emitNotificationToUsers } from '@/app/lib/socketEmit'
 
+export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 const validStatus = [
@@ -45,7 +50,7 @@ const sortMap = {
     `,
 }
 
-function buildTaskWhere({ userId, role, filters }) {
+function buildTaskWhere({ user, filters }) {
     const where = [
         't.deleted_at IS NULL',
         'p.deleted_at IS NULL',
@@ -53,13 +58,11 @@ function buildTaskWhere({ userId, role, filters }) {
 
     const values = []
 
-    const isAdminScope =
-        ['Admin', 'Manager'].includes(role)
+    const userId = user.id
+    const canViewAll = hasTaskWideAccess(user)
+    const canViewRelated = hasTaskRelatedAccess(user)
 
-    const isTeamLead =
-        role === 'Team Lead'
-
-    if (!isAdminScope && isTeamLead) {
+    if (!canViewAll && canViewRelated) {
         where.push(`
             (
                 EXISTS (
@@ -80,7 +83,7 @@ function buildTaskWhere({ userId, role, filters }) {
         values.push(userId, userId)
     }
 
-    if (!isAdminScope && !isTeamLead) {
+    if (!canViewAll && !canViewRelated) {
         where.push(`
             EXISTS (
                 SELECT 1
@@ -166,9 +169,7 @@ function buildTaskWhere({ userId, role, filters }) {
         }
 
         if (filters.due === 'today') {
-            where.push(`
-                t.due_date = CURDATE()
-            `)
+            where.push('t.due_date = CURDATE()')
         }
 
         if (filters.due === 'next7') {
@@ -200,11 +201,10 @@ function buildTaskWhere({ userId, role, filters }) {
     }
 }
 
-async function getAvailableProjects({ userId, role }) {
-    const isAdminScope =
-        ['Admin', 'Manager'].includes(role)
+async function getAvailableProjects({ user }) {
+    const userId = user.id
 
-    if (isAdminScope) {
+    if (hasTaskWideAccess(user)) {
         const [rows] = await db.execute(`
             SELECT
                 project_id,
@@ -242,9 +242,9 @@ async function getAvailableProjects({ userId, role }) {
     return rows
 }
 
-async function getAvailableAssignees({ userId, role }) {
-    const canSeeManyUsers =
-        ['Admin', 'Manager', 'Team Lead'].includes(role)
+async function getAvailableAssignees({ user }) {
+    const userId = user.id
+    const canSeeManyUsers = hasTaskRelatedAccess(user)
 
     if (canSeeManyUsers) {
         const [rows] = await db.execute(`
@@ -259,6 +259,8 @@ async function getAvailableAssignees({ userId, role }) {
             FROM \`user\` u
             LEFT JOIN role r
                 ON u.role_id = r.role_id
+            WHERE u.deleted_at IS NULL
+            AND u.status = 'active'
             ORDER BY u.first_name_th ASC
         `)
 
@@ -279,6 +281,8 @@ async function getAvailableAssignees({ userId, role }) {
         LEFT JOIN role r
             ON u.role_id = r.role_id
         WHERE u.id = ?
+        AND u.deleted_at IS NULL
+        AND u.status = 'active'
         `,
         [userId]
     )
@@ -288,77 +292,39 @@ async function getAvailableAssignees({ userId, role }) {
 
 export async function GET(request) {
     try {
-        const accessToken =
-            request.cookies.get('accessToken')?.value
+        const auth = await requirePermission(
+            request,
+            'task.view'
+        )
 
-        if (!accessToken) {
-            return NextResponse.json(
-                {
-                    success: false,
-                    message: 'กรุณาเข้าสู่ระบบใหม่อีกครั้ง',
-                },
-                { status: 401 }
-            )
-        }
+        if (auth.response) return auth.response
 
-        const payload = safeVerifyToken(accessToken)
+        const user = auth.user
+        const userId = user.id
 
-        if (!payload?.id) {
-            return NextResponse.json(
-                {
-                    success: false,
-                    message: 'Token ไม่ถูกต้อง',
-                },
-                { status: 401 }
-            )
-        }
+        const { searchParams } = new URL(request.url)
 
-        const userId = payload.id
+        const pageRaw = Number(searchParams.get('page')) || 1
+        const limitRaw = Number(searchParams.get('limit')) || 10
 
-        const role =
-            payload.permission_role || 'Employee'
-
-        const { searchParams } =
-            new URL(request.url)
-
-        const pageRaw =
-            Number(searchParams.get('page')) || 1
-
-        const limitRaw =
-            Number(searchParams.get('limit')) || 10
-
-        const page =
-            Math.max(pageRaw, 1)
-
-        const limit =
-            Math.min(Math.max(limitRaw, 1), 50)
-
-        const offset =
-            (page - 1) * limit
+        const page = Math.max(pageRaw, 1)
+        const limit = Math.min(Math.max(limitRaw, 1), 50)
+        const offset = (page - 1) * limit
 
         const filters = {
             q: (searchParams.get('q') || '').trim(),
-            project_id:
-                searchParams.get('project_id') || 'all',
-            status:
-                searchParams.get('status') || 'all',
-            priority:
-                searchParams.get('priority') || 'all',
-            assignee_id:
-                searchParams.get('assignee_id') || 'all',
-            due:
-                searchParams.get('due') || 'all',
+            project_id: searchParams.get('project_id') || 'all',
+            status: searchParams.get('status') || 'all',
+            priority: searchParams.get('priority') || 'all',
+            assignee_id: searchParams.get('assignee_id') || 'all',
+            due: searchParams.get('due') || 'all',
         }
 
-        const sort =
-            searchParams.get('sort') || 'updated'
-
-        const orderBy =
-            sortMap[sort] || sortMap.updated
+        const sort = searchParams.get('sort') || 'updated'
+        const orderBy = sortMap[sort] || sortMap.updated
 
         const taskWhere = buildTaskWhere({
-            userId,
-            role,
+            user,
             filters,
         })
 
@@ -373,11 +339,8 @@ export async function GET(request) {
             taskWhere.values
         )
 
-        const total =
-            countRows[0]?.total || 0
-
-        const totalPages =
-            Math.max(Math.ceil(total / limit), 1)
+        const total = countRows[0]?.total || 0
+        const totalPages = Math.max(Math.ceil(total / limit), 1)
 
         const [taskRows] = await db.execute(
             `
@@ -438,21 +401,16 @@ export async function GET(request) {
             taskWhere.values
         )
 
-        const availableProjects =
-            await getAvailableProjects({
-                userId,
-                role,
-            })
+        const availableProjects = await getAvailableProjects({
+            user,
+        })
 
-        const availableAssignees =
-            await getAvailableAssignees({
-                userId,
-                role,
-            })
+        const availableAssignees = await getAvailableAssignees({
+            user,
+        })
 
         return NextResponse.json({
             success: true,
-            role,
             tasks: taskRows,
             filters,
             options: {
@@ -482,52 +440,32 @@ export async function GET(request) {
         )
     }
 }
+
 export async function POST(request) {
     let connection
 
     try {
-        const accessToken =
-            request.cookies.get('accessToken')?.value
+        const auth = await requirePermission(
+            request,
+            'task.create'
+        )
 
-        if (!accessToken) {
+        if (auth.response) return auth.response
+
+        const user = auth.user
+        const userId = user.id
+
+        const body = await request.json().catch(() => null)
+
+        if (!body) {
             return NextResponse.json(
                 {
                     success: false,
-                    message: 'กรุณาเข้าสู่ระบบใหม่อีกครั้ง',
+                    message: 'รูปแบบข้อมูลไม่ถูกต้อง',
                 },
-                { status: 401 }
+                { status: 400 }
             )
         }
-
-        const payload = safeVerifyToken(accessToken)
-
-        if (!payload?.id) {
-            return NextResponse.json(
-                {
-                    success: false,
-                    message: 'Token ไม่ถูกต้อง',
-                },
-                { status: 401 }
-            )
-        }
-
-        const userId = payload.id
-        const role = payload.permission_role || 'Employee'
-
-        const canCreate =
-            ['Admin', 'Manager', 'Team Lead'].includes(role)
-
-        if (!canCreate) {
-            return NextResponse.json(
-                {
-                    success: false,
-                    message: 'คุณไม่มีสิทธิ์สร้างงาน',
-                },
-                { status: 403 }
-            )
-        }
-
-        const body = await request.json()
 
         const {
             project_id,
@@ -539,20 +477,6 @@ export async function POST(request) {
             due_date,
             assignee_ids = [],
         } = body
-
-        const validPriority = [
-            'low',
-            'medium',
-            'high',
-            'critical',
-        ]
-
-        const validStatus = [
-            'todo',
-            'in_progress',
-            'review',
-            'done',
-        ]
 
         if (!project_id || !task_name) {
             return NextResponse.json(
@@ -584,6 +508,18 @@ export async function POST(request) {
             )
         }
 
+        const projectId = Number(project_id)
+
+        if (!projectId) {
+            return NextResponse.json(
+                {
+                    success: false,
+                    message: 'project_id ไม่ถูกต้อง',
+                },
+                { status: 400 }
+            )
+        }
+
         const [projectRows] = await db.execute(
             `
             SELECT
@@ -595,7 +531,7 @@ export async function POST(request) {
             AND deleted_at IS NULL
             LIMIT 1
             `,
-            [Number(project_id)]
+            [projectId]
         )
 
         const project = projectRows[0]
@@ -610,7 +546,7 @@ export async function POST(request) {
             )
         }
 
-        if (role === 'Team Lead') {
+        if (!hasTaskWideAccess(user)) {
             const [accessRows] = await db.execute(
                 `
                 SELECT 1 AS allowed
@@ -628,9 +564,9 @@ export async function POST(request) {
                 LIMIT 1
                 `,
                 [
-                    Number(project_id),
+                    projectId,
                     userId,
-                    Number(project_id),
+                    projectId,
                     userId,
                 ]
             )
@@ -646,13 +582,15 @@ export async function POST(request) {
             }
         }
 
-        const cleanAssigneeIds = [
-            ...new Set(
-                assignee_ids
-                    .filter(Boolean)
-                    .map((item) => String(item))
-            ),
-        ]
+        const cleanAssigneeIds = Array.isArray(assignee_ids)
+            ? [
+                  ...new Set(
+                      assignee_ids
+                          .filter(Boolean)
+                          .map((item) => String(item))
+                  ),
+              ]
+            : []
 
         const completedAt =
             status === 'done'
@@ -664,8 +602,7 @@ export async function POST(request) {
 
         const [result] = await connection.execute(
             `
-            INSERT INTO task
-            (
+            INSERT INTO task (
                 project_id,
                 task_name,
                 description,
@@ -676,11 +613,10 @@ export async function POST(request) {
                 completed_at,
                 created_by
             )
-            VALUES
-            (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             `,
             [
-                Number(project_id),
+                projectId,
                 task_name,
                 description || null,
                 priority,
@@ -696,16 +632,16 @@ export async function POST(request) {
         const notificationTargetUserIds = []
 
         if (cleanAssigneeIds.length > 0) {
-            const assignmentValues =
-                cleanAssigneeIds.map((assignedUserId) => [
+            const assignmentValues = cleanAssigneeIds.map(
+                (assignedUserId) => [
                     taskId,
                     assignedUserId,
-                ])
+                ]
+            )
 
             await connection.query(
                 `
-                INSERT INTO task_assignment
-                (
+                INSERT INTO task_assignment (
                     task_id,
                     user_id
                 )
@@ -714,27 +650,26 @@ export async function POST(request) {
                 [assignmentValues]
             )
 
-            await createNotifications({
-                connection,
-                userIds: cleanAssigneeIds.filter(
-                    (assignedUserId) =>
-                        String(assignedUserId) !== String(userId)
-                ),
-                type: 'task_assigned',
-                title: 'คุณถูกมอบหมายงานใหม่',
-                message: `คุณถูกมอบหมายงาน: ${task_name}`,
-                link: `/dashboard/task/${taskId}`,
-                sourceTable: 'task',
-                sourceId: taskId,
-                createdBy: userId,
-            })
-
-            notificationTargetUserIds.push(
-                ...cleanAssigneeIds.filter(
-                    (assignedUserId) =>
-                        String(assignedUserId) !== String(userId)
-                )
+            const targetUserIds = cleanAssigneeIds.filter(
+                (assignedUserId) =>
+                    String(assignedUserId) !== String(userId)
             )
+
+            if (targetUserIds.length > 0) {
+                await createNotifications({
+                    connection,
+                    userIds: targetUserIds,
+                    type: 'task_assigned',
+                    title: 'คุณถูกมอบหมายงานใหม่',
+                    message: `คุณถูกมอบหมายงาน: ${task_name}`,
+                    link: `/dashboard/task/${taskId}`,
+                    sourceTable: 'task',
+                    sourceId: taskId,
+                    createdBy: userId,
+                })
+
+                notificationTargetUserIds.push(...targetUserIds)
+            }
         }
 
         const historyValues = [
@@ -778,8 +713,7 @@ export async function POST(request) {
 
         await connection.query(
             `
-            INSERT INTO task_history
-            (
+            INSERT INTO task_history (
                 task_id,
                 target_table,
                 target_column,
@@ -795,13 +729,17 @@ export async function POST(request) {
         )
 
         await connection.commit()
+
         await emitNotificationToUsers(notificationTargetUserIds)
-        
-        return NextResponse.json({
-            success: true,
-            message: 'สร้างงานสำเร็จ',
-            task_id: result.insertId,
-        })
+
+        return NextResponse.json(
+            {
+                success: true,
+                message: 'สร้างงานสำเร็จ',
+                task_id: taskId,
+            },
+            { status: 201 }
+        )
     } catch (error) {
         if (connection) {
             await connection.rollback()

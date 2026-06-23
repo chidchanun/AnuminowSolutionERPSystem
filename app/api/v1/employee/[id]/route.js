@@ -1,48 +1,25 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/app/lib/db'
-import { safeVerifyToken } from '@/app/lib/verifiedToken'
+import {
+    hasPermissionKey,
+    requirePermission,
+} from '@/app/lib/permission'
 
 export const dynamic = 'force-dynamic'
 
-async function getAuthUser(request) {
-    const accessToken = request.cookies.get('accessToken')?.value
-
-    if (!accessToken) return null
-
-    const payload = await safeVerifyToken(accessToken)
-
-    if (!payload?.id) return null
-
-    return {
-        id: payload.id,
-        role: payload.permission_role || 'Employee',
-    }
-}
-
-function canManageEmployee(user) {
-    return ['Admin', 'Manager'].includes(user?.role)
-}
-
 export async function GET(request, context) {
     try {
+        const auth = await requirePermission(
+            request,
+            'employee.view'
+        )
+
+        if (auth.response) return auth.response
+
+        const user = auth.user
         const { id } = await context.params
-        const employeeId = String(id || '').trim()
 
-        if (!employeeId) {
-            return NextResponse.json(
-                { success: false, message: 'Employee ID ไม่ถูกต้อง' },
-                { status: 400 }
-            )
-        }
-
-        const user = await getAuthUser(request)
-
-        if (!user) {
-            return NextResponse.json(
-                { success: false, message: 'Unauthorized' },
-                { status: 401 }
-            )
-        }
+        const employeeId = String(id)
 
         const [employeeRows] = await db.execute(
             `
@@ -169,10 +146,9 @@ export async function GET(request, context) {
             tasks: taskRows,
             activities: activityRows,
             permission: {
-                role: user.role,
-                can_edit: canManageEmployee(user),
+                can_edit: hasPermissionKey(user, 'employee.update'),
                 can_delete:
-                    canManageEmployee(user) &&
+                    hasPermissionKey(user, 'employee.delete') &&
                     String(user.id) !== String(employeeId),
             },
         })
@@ -195,25 +171,17 @@ export async function GET(request, context) {
 
 export async function PUT(request, context) {
     try {
+        const auth = await requirePermission(
+            request,
+            'employee.update'
+        )
+
+        if (auth.response) return auth.response
+
+        const user = auth.user
         const { id } = await context.params
-        const employeeId = String(id || '').trim()
 
-        const user = await getAuthUser(request)
-
-        if (!user) {
-            return NextResponse.json(
-                { success: false, message: 'Unauthorized' },
-                { status: 401 }
-            )
-        }
-
-        if (!canManageEmployee(user)) {
-            return NextResponse.json(
-                { success: false, message: 'คุณไม่มีสิทธิ์แก้ไขพนักงาน' },
-                { status: 403 }
-            )
-        }
-
+        const employeeId = String(id)
         const body = await request.json()
 
         const {
@@ -305,25 +273,17 @@ export async function PUT(request, context) {
 
 export async function DELETE(request, context) {
     try {
+        const auth = await requirePermission(
+            request,
+            'employee.delete'
+        )
+
+        if (auth.response) return auth.response
+
+        const user = auth.user
         const { id } = await context.params
-        const employeeId = String(id || '').trim()
 
-        const user = await getAuthUser(request)
-
-        if (!user) {
-            return NextResponse.json(
-                { success: false, message: 'Unauthorized' },
-                { status: 401 }
-            )
-        }
-
-        if (!canManageEmployee(user)) {
-            return NextResponse.json(
-                { success: false, message: 'คุณไม่มีสิทธิ์ลบพนักงาน' },
-                { status: 403 }
-            )
-        }
-
+        const employeeId = String(id)
         if (String(user.id) === String(employeeId)) {
             return NextResponse.json(
                 { success: false, message: 'ไม่สามารถลบบัญชีของตัวเองได้' },

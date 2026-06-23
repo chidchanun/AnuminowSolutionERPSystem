@@ -1,8 +1,6 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/app/lib/db'
-import { safeVerifyToken } from '@/app/lib/verifiedToken'
-
-const allowedRoles = ['Admin', 'Manager']
+import { requirePermission } from '@/app/lib/permission'
 
 function normalizeFilter(value) {
     if (!value || value === 'all') {
@@ -111,52 +109,12 @@ function buildTaskWhere({
 
 export async function GET(request) {
     try {
-        const token =
-            request.cookies.get('accessToken')?.value
+        const auth = await requirePermission(
+            request,
+            'report.view'
+        )
 
-        if (!token) {
-            return NextResponse.json(
-                {
-                    success: false,
-                    message: 'Unauthorized',
-                },
-                {
-                    status: 401,
-                }
-            )
-        }
-
-        const payload =
-            await safeVerifyToken(token)
-
-        if (!payload) {
-            return NextResponse.json(
-                {
-                    success: false,
-                    message: 'Invalid token',
-                },
-                {
-                    status: 401,
-                }
-            )
-        }
-
-        const role =
-            payload.permission_role ||
-            payload.role ||
-            ''
-
-        if (!allowedRoles.includes(role)) {
-            return NextResponse.json(
-                {
-                    success: false,
-                    message: 'ไม่มีสิทธิ์เข้าถึงรายงาน',
-                },
-                {
-                    status: 403,
-                }
-            )
-        }
+        if (auth.response) return auth.response
 
         const { searchParams } =
             new URL(request.url)

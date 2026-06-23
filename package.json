@@ -6,7 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "node --experimental-vm-modules --test scripts/test-*.mjs",
+    "seed:permissions": "node scripts/seed-permissions.mjs",
+    "seed:permissions:dry": "node scripts/seed-permissions.mjs --dry-run"
   },
   "dependencies": {
     "@tiptap/extension-color": "^3.26.1",

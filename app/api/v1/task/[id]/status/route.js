@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/app/lib/db'
-import { safeVerifyToken } from '@/app/lib/verifiedToken'
+import {
+    hasTaskWideAccess,
+    requirePermission,
+} from '@/app/lib/permission'
 
 export const dynamic = 'force-dynamic'
 
@@ -28,34 +31,15 @@ export async function PATCH(request, context) {
         }
 
         const taskId = Number(id)
+        const auth = await requirePermission(
+            request,
+            'task.update'
+        )
 
-        const accessToken =
-            request.cookies.get('accessToken')?.value
+        if (auth.response) return auth.response
 
-        if (!accessToken) {
-            return NextResponse.json(
-                {
-                    success: false,
-                    message: 'กรุณาเข้าสู่ระบบใหม่อีกครั้ง',
-                },
-                { status: 401 }
-            )
-        }
-
-        const payload = safeVerifyToken(accessToken)
-
-        if (!payload?.id) {
-            return NextResponse.json(
-                {
-                    success: false,
-                    message: 'Token ไม่ถูกต้อง',
-                },
-                { status: 401 }
-            )
-        }
-
-        const userId = payload.id
-        const role = payload.permission_role || 'Employee'
+        const user = auth.user
+        const userId = user.id
 
         const body = await request.json()
         const newStatus = body.status
@@ -110,16 +94,9 @@ export async function PATCH(request, context) {
                 new_status: newStatus,
             })
         }
-
-        const isAdminScope =
-            ['Admin', 'Manager'].includes(role)
-
-        let canUpdate = false
-
-        if (isAdminScope) {
-            canUpdate = true
-        } else if (role === 'Team Lead') {
-            const [rows] = await db.execute(
+        const canUpdate = hasTaskWideAccess(user)
+            ? true
+            : (await db.execute(
                 `
                 SELECT 1 AS allowed
                 FROM project_member pm
@@ -141,7 +118,7 @@ export async function PATCH(request, context) {
                 AND t.created_by = ?
 
                 LIMIT 1
-                `,
+                `, 
                 [
                     task.project_id,
                     userId,
@@ -150,23 +127,7 @@ export async function PATCH(request, context) {
                     taskId,
                     userId,
                 ]
-            )
-
-            canUpdate = rows.length > 0
-        } else {
-            const [rows] = await db.execute(
-                `
-                SELECT 1 AS allowed
-                FROM task_assignment
-                WHERE task_id = ?
-                AND user_id = ?
-                LIMIT 1
-                `,
-                [taskId, userId]
-            )
-
-            canUpdate = rows.length > 0
-        }
+            ))[0].length > 0
 
         if (!canUpdate) {
             return NextResponse.json(

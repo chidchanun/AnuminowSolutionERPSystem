@@ -1,5 +1,10 @@
 import { db } from '@/app/lib/db'
-import { safeVerifyToken } from '@/app/lib/verifiedToken'
+import {
+    getAuthUserWithPermissions,
+    hasPermissionKey,
+    hasTaskRelatedAccess,
+    hasTaskWideAccess,
+} from '@/app/lib/permission'
 
 const validActionTypes = [
     'create',
@@ -12,18 +17,9 @@ const validActionTypes = [
 ]
 
 export async function getActivityAuthUser(request) {
-    const accessToken =
-        request.cookies.get('accessToken')?.value
+    const user = await getAuthUserWithPermissions(request)
 
-    if (!accessToken) {
-        return null
-    }
-
-    const payload = await safeVerifyToken(accessToken)
-
-    if (!payload?.id) {
-        return null
-    }
+    if (!user) return null
 
     const [rows] = await db.execute(
         `
@@ -41,24 +37,22 @@ export async function getActivityAuthUser(request) {
         WHERE u.id = ?
         LIMIT 1
         `,
-        [payload.id]
+        [user.id]
     )
 
     return {
-        id: payload.id,
-        role: payload.permission_role || 'Employee',
+        ...user,
         full_name:
             rows[0]?.full_name ||
-            payload.id,
+            user.id,
         role_name:
             rows[0]?.role_name ||
-            payload.permission_role ||
-            'Employee',
+            user.permission_role_name,
     }
 }
 
 export function canExportActivity(user) {
-    return ['Admin', 'Manager', 'Team Lead'].includes(user?.role)
+    return hasPermissionKey(user, 'activity.export')
 }
 
 export function getActivityFilters(request) {
@@ -121,13 +115,12 @@ function buildActivityWhere({
     const where = []
     const values = []
 
-    const role = user.role
     const userId = user.id
 
-    const isAdminScope =
-        ['Admin', 'Manager'].includes(role)
+    const canViewAll = hasTaskWideAccess(user)
+    const canViewRelated = hasTaskRelatedAccess(user)
 
-    if (!isAdminScope && role === 'Team Lead') {
+    if (!canViewAll && canViewRelated) {
         where.push(`
             (
                 t.created_by = ?
@@ -150,7 +143,7 @@ function buildActivityWhere({
         values.push(userId, userId, userId, userId)
     }
 
-    if (!isAdminScope && role !== 'Team Lead') {
+    if (!canViewAll && !canViewRelated) {
         where.push(`
             EXISTS (
                 SELECT 1

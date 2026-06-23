@@ -1,25 +1,13 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/app/lib/db'
-import { safeVerifyToken } from '@/app/lib/verifiedToken'
+import { emitNotificationToUsers } from '@/app/lib/socketEmit'
+import { createLeaveResultNotification } from '@/app/lib/leaveNotify'
+import {
+    hasPermissionKey,
+    requirePermission,
+} from '@/app/lib/permission'
 
 export const dynamic = 'force-dynamic'
-
-async function getAuthUser(request) {
-    const accessToken = request.cookies.get('accessToken')?.value
-    if (!accessToken) return null
-
-    const payload = await safeVerifyToken(accessToken)
-    if (!payload?.id) return null
-
-    return {
-        id: payload.id,
-        role: payload.permission_role || 'Employee',
-    }
-}
-
-function canManageLeave(user) {
-    return ['Admin', 'Manager'].includes(user?.role)
-}
 
 function getDateRange(startDate, endDate) {
     const dates = []
@@ -38,32 +26,17 @@ export async function PATCH(request, context) {
     let connection
 
     try {
+        const auth = await requirePermission(
+            request,
+            'leave.approve'
+        )
+
+        if (auth.response) return auth.response
+
+        const user = auth.user
+
         const { id } = await context.params
         const leaveId = Number(id)
-
-        if (!leaveId) {
-            return NextResponse.json(
-                { success: false, message: 'Leave ID ไม่ถูกต้อง' },
-                { status: 400 }
-            )
-        }
-
-        const user = await getAuthUser(request)
-
-        if (!user) {
-            return NextResponse.json(
-                { success: false, message: 'Unauthorized' },
-                { status: 401 }
-            )
-        }
-
-        if (!canManageLeave(user)) {
-            return NextResponse.json(
-                { success: false, message: 'คุณไม่มีสิทธิ์อนุมัติการลา' },
-                { status: 403 }
-            )
-        }
-
         const body = await request.json()
         const {
             status,
@@ -82,6 +55,7 @@ export async function PATCH(request, context) {
             SELECT
                 leave_id,
                 user_id,
+                leave_type,
                 start_date,
                 end_date,
                 status
@@ -162,9 +136,19 @@ export async function PATCH(request, context) {
                 )
             }
         }
-
+        const notificationTargetUserIds =
+            await createLeaveResultNotification({
+                connection,
+                leaveId,
+                requesterId: leave.user_id,
+                approverId: user.id,
+                leaveType: leave.leave_type,
+                startDate: leave.start_date,
+                endDate: leave.end_date,
+                status,
+            })
         await connection.commit()
-
+        await emitNotificationToUsers(notificationTargetUserIds)
         return NextResponse.json({
             success: true,
             message:
@@ -231,7 +215,7 @@ export async function DELETE(request, context) {
         }
 
         const canDelete =
-            canManageLeave(user) ||
+            hasPermissionKey(user, 'leave.approve') ||
             (
                 String(leave.user_id) === String(user.id) &&
                 leave.status === 'pending'

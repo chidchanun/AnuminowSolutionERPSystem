@@ -1,33 +1,25 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/app/lib/db'
-import { safeVerifyToken } from '@/app/lib/verifiedToken'
+import {
+    hasProjectWideAccess,
+    requirePermission,
+} from '@/app/lib/permission'
 
 export async function GET(request) {
     try {
-        const accessToken =
-            request.cookies.get('accessToken')?.value
+        const auth = await requirePermission(
+            request,
+            'project.view'
+        )
 
-        if (!accessToken) {
-            return NextResponse.json(
-                { message: 'Unauthorized' },
-                { status: 401 }
-            )
-        }
+        if (auth.response) return auth.response
 
-        const payload =
-            safeVerifyToken(accessToken)
-
-        if (!payload) {
-            return NextResponse.json(
-                { message: 'Unauthorized' },
-                { status: 401 }
-            )
-        }
+        const user = auth.user
 
         let query = ''
         let params = []
 
-        if (payload.permission_role === 'Admin') {
+        if (hasProjectWideAccess(user)) {
             query = `
                 SELECT
                     COUNT(*) total,
@@ -40,9 +32,7 @@ export async function GET(request) {
             `
         }
 
-        else if (
-            payload.permission_role === 'Manager'
-        ) {
+        else {
             query = `
                 SELECT
                     COUNT(DISTINCT p.project_id) total,
@@ -64,30 +54,9 @@ export async function GET(request) {
             `
 
             params = [
-                payload.id,
-                payload.id
+                user.id,
+                user.id
             ]
-        }
-
-        else {
-            query = `
-                SELECT
-                    COUNT(*) total,
-                    SUM(p.status='planning') planning,
-                    SUM(p.status='active') active,
-                    SUM(p.status='completed') completed,
-                    SUM(p.status='cancelled') cancelled
-                FROM project p
-
-                INNER JOIN project_member pm
-                    ON pm.project_id = p.project_id
-
-                WHERE
-                    p.deleted_at IS NULL
-                    AND pm.user_id = ?
-            `
-
-            params = [payload.id]
         }
 
         const [rows] =

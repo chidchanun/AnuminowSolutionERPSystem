@@ -1,5 +1,8 @@
 import { db } from '@/app/lib/db'
-import { safeVerifyToken } from '@/app/lib/verifiedToken'
+import {
+    getAuthUserWithPermissions,
+    hasPermissionKey,
+} from '@/app/lib/permission'
 
 const validReportTypes = [
     'overview',
@@ -9,18 +12,9 @@ const validReportTypes = [
 ]
 
 export async function getReportAuthUser(request) {
-    const accessToken =
-        request.cookies.get('accessToken')?.value
+    const user = await getAuthUserWithPermissions(request)
 
-    if (!accessToken) {
-        return null
-    }
-
-    const payload = await safeVerifyToken(accessToken)
-
-    if (!payload?.id) {
-        return null
-    }
+    if (!user) return null
 
     const [rows] = await db.execute(
         `
@@ -38,24 +32,22 @@ export async function getReportAuthUser(request) {
         WHERE u.id = ?
         LIMIT 1
         `,
-        [payload.id]
+        [user.id]
     )
 
     return {
-        id: payload.id,
-        role: payload.permission_role || 'Employee',
+        ...user,
         full_name:
             rows[0]?.full_name ||
-            payload.id,
+            user.id,
         role_name:
             rows[0]?.role_name ||
-            payload.permission_role ||
-            'Employee',
+            user.permission_role_name,
     }
 }
 
 export function canAccessReport(user) {
-    return ['Admin', 'Manager'].includes(user?.role)
+    return hasPermissionKey(user, 'report.view')
 }
 
 export function getReportFilters(request) {

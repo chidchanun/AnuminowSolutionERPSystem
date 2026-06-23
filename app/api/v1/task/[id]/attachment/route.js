@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/app/lib/db'
-import { safeVerifyToken } from '@/app/lib/verifiedToken'
+import {
+    getAuthUserWithPermissions,
+    hasTaskWideAccess,
+} from '@/app/lib/permission'
 import path from 'path'
 import { mkdir, writeFile } from 'fs/promises'
 
@@ -21,9 +24,6 @@ const allowedMimeTypes = [
     'application/vnd.openxmlformats-officedocument.presentationml.presentation',
 ]
 
-function isAdminRole(role) {
-    return ['Admin', 'Manager'].includes(role)
-}
 
 function sanitizeFileName(fileName) {
     return String(fileName || 'file')
@@ -32,22 +32,7 @@ function sanitizeFileName(fileName) {
 }
 
 async function getAuthUser(request) {
-    const token = request.cookies.get('accessToken')?.value
-
-    if (!token) {
-        return null
-    }
-
-    const payload = await safeVerifyToken(token)
-
-    if (!payload) {
-        return null
-    }
-
-    return {
-        id: payload.id,
-        role: payload.permission_role,
-    }
+    return getAuthUserWithPermissions(request)
 }
 
 async function canAccessTask(taskId, user) {
@@ -55,7 +40,7 @@ async function canAccessTask(taskId, user) {
         return false
     }
 
-    if (isAdminRole(user.role)) {
+    if (hasTaskWideAccess(user)) {
         const [rows] = await db.execute(
             `
             SELECT task_id
@@ -180,7 +165,7 @@ export async function GET(request, { params }) {
             success: true,
             attachments,
             current_user_id: user.id,
-            current_user_role: user.role,
+            current_user_permissions: user.permissions || [],
         })
     } catch (error) {
         console.error('GET Task Attachment Error:', error)

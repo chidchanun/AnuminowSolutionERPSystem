@@ -1,6 +1,10 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/app/lib/db'
-import { safeVerifyToken } from '@/app/lib/verifiedToken'
+import {
+    hasTaskRelatedAccess,
+    hasTaskWideAccess,
+    requirePermission,
+} from '@/app/lib/permission'
 
 export const dynamic = 'force-dynamic'
 
@@ -28,8 +32,7 @@ const columns = {
 }
 
 function buildWhere({
-    userId,
-    role,
+    user,
     filters,
     isAdminView,
 }) {
@@ -39,14 +42,14 @@ function buildWhere({
     ]
 
     const values = []
+    const userId = user.id
 
     const isAdminScope =
-        isAdminView && ['Admin', 'Manager'].includes(role)
+        isAdminView && hasTaskWideAccess(user)
 
-    const isTeamLead =
-        role === 'Team Lead'
+    const canViewRelated = hasTaskRelatedAccess(user)
 
-    if (!isAdminScope && isTeamLead) {
+    if (!isAdminScope && canViewRelated) {
         where.push(`
             (
                 t.created_by = ?
@@ -68,7 +71,7 @@ function buildWhere({
         values.push(userId, userId, userId)
     }
 
-    if (!isAdminScope && !isTeamLead) {
+    if (!isAdminScope && !canViewRelated) {
         where.push(`
             EXISTS (
                 SELECT 1
@@ -179,12 +182,12 @@ function buildWhere({
 }
 
 async function getAvailableProjects({
-    userId,
-    role,
+    user,
     isAdminView,
 }) {
+    const userId = user.id
     const isAdminScope =
-        isAdminView && ['Admin', 'Manager'].includes(role)
+        isAdminView && hasTaskWideAccess(user)
 
     if (isAdminScope) {
         const [rows] = await db.execute(`
@@ -226,11 +229,10 @@ async function getAvailableProjects({
 }
 
 async function getAvailableAssignees({
-    userId,
-    role,
+    user,
 }) {
-    const canSeeManyUsers =
-        ['Admin', 'Manager', 'Team Lead'].includes(role)
+    const userId = user.id
+    const canSeeManyUsers = hasTaskRelatedAccess(user)
 
     if (canSeeManyUsers) {
         const [rows] = await db.execute(`
@@ -274,33 +276,15 @@ async function getAvailableAssignees({
 
 export async function GET(request) {
     try {
-        const accessToken =
-            request.cookies.get('accessToken')?.value
+        const auth = await requirePermission(
+            request,
+            'task.view'
+        )
 
-        if (!accessToken) {
-            return NextResponse.json(
-                {
-                    success: false,
-                    message: 'กรุณาเข้าสู่ระบบใหม่อีกครั้ง',
-                },
-                { status: 401 }
-            )
-        }
+        if (auth.response) return auth.response
 
-        const payload = safeVerifyToken(accessToken)
-
-        if (!payload?.id) {
-            return NextResponse.json(
-                {
-                    success: false,
-                    message: 'Token ไม่ถูกต้อง',
-                },
-                { status: 401 }
-            )
-        }
-
-        const userId = payload.id
-        const role = payload.permission_role || 'Employee'
+        const user = auth.user
+        const userId = user.id
 
         const { searchParams } =
             new URL(request.url)
@@ -308,8 +292,7 @@ export async function GET(request) {
         const requestedView =
             searchParams.get('view') || 'mine'
 
-        const canViewAdmin =
-            ['Admin', 'Manager'].includes(role)
+        const canViewAdmin = hasTaskWideAccess(user)
 
         const viewMode =
             requestedView === 'admin' && canViewAdmin
@@ -332,8 +315,7 @@ export async function GET(request) {
         }
 
         const taskWhere = buildWhere({
-            userId,
-            role,
+            user,
             filters,
             isAdminView,
         })
@@ -413,20 +395,17 @@ export async function GET(request) {
 
         const availableProjects =
             await getAvailableProjects({
-                userId,
-                role,
+                user,
                 isAdminView,
             })
 
         const availableAssignees =
             await getAvailableAssignees({
-                userId,
-                role,
+                user,
             })
 
         return NextResponse.json({
             success: true,
-            role,
             view_mode: viewMode,
             can_view_admin: canViewAdmin,
             filters,

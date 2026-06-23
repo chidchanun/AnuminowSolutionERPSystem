@@ -1,25 +1,11 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/app/lib/db'
-import { safeVerifyToken } from '@/app/lib/verifiedToken'
+import {
+    hasPermission,
+    requirePermission,
+} from '@/app/lib/permission'
 
 export const dynamic = 'force-dynamic'
-
-async function getAuthUser(request) {
-    const accessToken = request.cookies.get('accessToken')?.value
-    if (!accessToken) return null
-
-    const payload = await safeVerifyToken(accessToken)
-    if (!payload?.id) return null
-
-    return {
-        id: payload.id,
-        role: payload.permission_role || 'Employee',
-    }
-}
-
-function canManageAttendance(user) {
-    return ['Admin', 'Manager'].includes(user?.role)
-}
 
 function getTodayISO() {
     return new Date().toISOString().slice(0, 10)
@@ -44,14 +30,20 @@ function getWeekStartEnd() {
 
 export async function GET(request) {
     try {
-        const user = await getAuthUser(request)
 
-        if (!user) {
-            return NextResponse.json(
-                { success: false, message: 'Unauthorized' },
-                { status: 401 }
-            )
-        }
+        const auth = await requirePermission(
+            request,
+            'attendance.view'
+        )
+
+        if (auth.response) return auth.response
+
+        const user = auth.user
+
+        const canManage = await hasPermission(
+            user.id,
+            'attendance.manage'
+        )
 
         const { searchParams } = new URL(request.url)
 
@@ -74,7 +66,7 @@ export async function GET(request) {
 
         const values = []
 
-        if (!canManageAttendance(user)) {
+        if (!canManage) {
             where.push('u.id = ?')
             values.push(user.id)
         }
@@ -209,8 +201,8 @@ export async function GET(request) {
             daily_attendance: dailyRows,
             attendance: dailyRows,
             permission: {
-                can_manage: canManageAttendance(user),
-            },
+                can_manage: canManage,
+            }
         })
     } catch (error) {
         console.error('Attendance GET error:', error)
@@ -231,22 +223,14 @@ export async function GET(request) {
 
 export async function POST(request) {
     try {
-        const user = await getAuthUser(request)
+        const auth = await requirePermission(
+            request,
+            'attendance.manage'
+        )
 
-        if (!user) {
-            return NextResponse.json(
-                { success: false, message: 'Unauthorized' },
-                { status: 401 }
-            )
-        }
+        if (auth.response) return auth.response
 
-        if (!canManageAttendance(user)) {
-            return NextResponse.json(
-                { success: false, message: 'คุณไม่มีสิทธิ์บันทึก Attendance' },
-                { status: 403 }
-            )
-        }
-
+        const user = auth.user
         const body = await request.json()
 
         const {

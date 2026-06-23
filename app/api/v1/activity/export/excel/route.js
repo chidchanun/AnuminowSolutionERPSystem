@@ -9,6 +9,8 @@ import {
     getActivityFilters,
 } from '@/app/lib/activityExportData'
 
+import { requirePermission } from '@/app/lib/permission'
+
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
@@ -229,29 +231,13 @@ function addActivitySheet(workbook, rows) {
 
 export async function GET(request) {
     try {
-        const user =
-            await getActivityAuthUser(request)
+        const auth = await requirePermission(
+            request,
+            'activity.export'
+        )
 
-        if (!user) {
-            return NextResponse.json(
-                {
-                    success: false,
-                    message: 'Unauthorized',
-                },
-                { status: 401 }
-            )
-        }
-
-        if (!canExportActivity(user)) {
-            return NextResponse.json(
-                {
-                    success: false,
-                    message: 'ไม่มีสิทธิ์ Export Activity Log',
-                },
-                { status: 403 }
-            )
-        }
-
+        if (auth.response) return auth.response
+        const user = auth.user
         const filters =
             getActivityFilters(request)
 

@@ -1,36 +1,30 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/app/lib/db'
-import { safeVerifyToken } from '@/app/lib/verifiedToken'
+import { emitNotificationToUsers } from '@/app/lib/socketEmit'
+import { createLeaveSubmittedNotifications } from '@/app/lib/leaveNotify'
+import {
+    hasPermission,
+    hasPermissionKey,
+    requirePermission,
+} from '@/app/lib/permission'
 
 export const dynamic = 'force-dynamic'
 
-async function getAuthUser(request) {
-    const accessToken = request.cookies.get('accessToken')?.value
-    if (!accessToken) return null
-
-    const payload = await safeVerifyToken(accessToken)
-    if (!payload?.id) return null
-
-    return {
-        id: payload.id,
-        role: payload.permission_role || 'Employee',
-    }
-}
-
-function canManageLeave(user) {
-    return ['Admin', 'Manager'].includes(user?.role)
-}
-
 export async function GET(request) {
     try {
-        const user = await getAuthUser(request)
+        const auth = await requirePermission(
+            request,
+            'leave.view'
+        )
 
-        if (!user) {
-            return NextResponse.json(
-                { success: false, message: 'Unauthorized' },
-                { status: 401 }
-            )
-        }
+        if (auth.response) return auth.response
+
+        const user = auth.user
+
+        const canApprove = await hasPermission(
+            user.id,
+            'leave.approve'
+        )
 
         const { searchParams } = new URL(request.url)
         const status = searchParams.get('status') || 'all'
@@ -40,7 +34,7 @@ export async function GET(request) {
         ]
         const values = []
 
-        if (!canManageLeave(user)) {
+        if (!canApprove) {
             where.push('lr.user_id = ?')
             values.push(user.id)
         }
@@ -94,7 +88,7 @@ export async function GET(request) {
             success: true,
             leaves: rows,
             permission: {
-                can_manage: canManageLeave(user),
+                can_approve: canApprove,
             },
         })
     } catch (error) {
@@ -116,14 +110,14 @@ export async function GET(request) {
 
 export async function POST(request) {
     try {
-        const user = await getAuthUser(request)
+        const auth = await requirePermission(
+            request,
+            'leave.create'
+        )
 
-        if (!user) {
-            return NextResponse.json(
-                { success: false, message: 'Unauthorized' },
-                { status: 401 }
-            )
-        }
+        if (auth.response) return auth.response
+
+        const user = auth.user
 
         const body = await request.json()
 
@@ -136,7 +130,7 @@ export async function POST(request) {
         } = body
 
         const targetUserId =
-            canManageLeave(user) && user_id
+            hasPermissionKey(user, 'leave.approve') && user_id
                 ? user_id
                 : user.id
 
@@ -182,10 +176,24 @@ export async function POST(request) {
             ]
         )
 
+        const leaveId = result.insertId
+
+        const notificationTargetUserIds =
+            await createLeaveSubmittedNotifications({
+                leaveId,
+                requesterId: targetUserId,
+                leaveType: leave_type,
+                startDate: start_date,
+                endDate: end_date,
+                createdBy: user.id,
+            })
+
+        await emitNotificationToUsers(notificationTargetUserIds)
+
         return NextResponse.json({
             success: true,
             message: 'ส่งคำขอลาสำเร็จ',
-            leave_id: result.insertId,
+            leave_id: leaveId,
         })
     } catch (error) {
         console.error('Leave POST error:', error)

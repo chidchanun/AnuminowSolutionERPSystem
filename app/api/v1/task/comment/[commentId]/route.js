@@ -1,28 +1,13 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/app/lib/db'
-import { safeVerifyToken } from '@/app/lib/verifiedToken'
+import {
+    getAuthUserWithPermissions,
+    hasTaskWideAccess,
+} from '@/app/lib/permission'
 
-function isAdminRole(role) {
-    return ['Admin', 'Manager'].includes(role)
-}
 
 async function getAuthUser(request) {
-    const token = request.cookies.get('accessToken')?.value
-
-    if (!token) {
-        return null
-    }
-
-    const payload = await safeVerifyToken(token)
-
-    if (!payload) {
-        return null
-    }
-
-    return {
-        id: payload.id,
-        role: payload.permission_role,
-    }
+    return getAuthUserWithPermissions(request)
 }
 
 async function getComment(commentId) {
@@ -49,7 +34,7 @@ function canModifyComment(comment, user) {
         return false
     }
 
-    if (isAdminRole(user.role)) {
+    if (hasTaskWideAccess(user)) {
         return true
     }
 

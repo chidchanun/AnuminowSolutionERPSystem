@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/app/lib/db'
-import { safeVerifyToken } from '@/app/lib/verifiedToken'
+import {
+    hasProjectWideAccess,
+    requirePermission,
+} from '@/app/lib/permission'
 
 export async function GET(
     request,
@@ -8,6 +11,16 @@ export async function GET(
 ) {
     try {
         const { id } = await params
+
+        const auth = await requirePermission(
+            request,
+            'project.view'
+        )
+
+        if (auth.response) return auth.response
+
+        const user = auth.user
+        const canViewAll = hasProjectWideAccess(user)
 
         const [projects] = await db.execute(
             `
@@ -23,8 +36,33 @@ export async function GET(
                 ON p.created_by = u.id
             WHERE p.project_id = ?
             AND p.deleted_at IS NULL
+            AND (
+                ? = 1
+                OR p.created_by = ?
+                OR EXISTS (
+                    SELECT 1
+                    FROM project_member pm_scope
+                    WHERE pm_scope.project_id = p.project_id
+                    AND pm_scope.user_id = ?
+                )
+                OR EXISTS (
+                    SELECT 1
+                    FROM task t_scope
+                    INNER JOIN task_assignment ta_scope
+                        ON t_scope.task_id = ta_scope.task_id
+                    WHERE t_scope.project_id = p.project_id
+                    AND ta_scope.user_id = ?
+                    AND t_scope.deleted_at IS NULL
+                )
+            )
             `,
-            [id]
+            [
+                id,
+                canViewAll ? 1 : 0,
+                user.id,
+                user.id,
+                user.id,
+            ]
         )
 
         if (projects.length === 0) {
@@ -74,29 +112,12 @@ export async function PUT(
     { params }
 ) {
     try {
+        const auth = await requirePermission(
+            request,
+            'project.update'
+        )
 
-
-        const token = request.cookies.get('accessToken')?.value
-
-        if (!token) {
-            return NextResponse.json({ message: 'โปรดเข้าสู่ระบบใหม่อีกครั้ง', status: 401 })
-        }
-
-        const user = safeVerifyToken(token)
-        if (!user) {
-            return NextResponse.json({ message: 'โปรดเข้าสู่ระบบใหม่อีกครั้ง' }, { status: 401 })
-        }
-
-        if (
-            !['Admin', 'Manager'].includes(
-                user.permission_role
-            )
-        ) {
-            return NextResponse.json(
-                { message: 'Forbidden' },
-                { status: 403 }
-            )
-        }
+        if (auth.response) return auth.response
 
         const { id } = await params
 
@@ -231,44 +252,14 @@ export async function DELETE(request, context) {
         }
 
         const projectId = Number(id)
+        const auth = await requirePermission(
+            request,
+            'project.delete'
+        )
 
-        const accessToken =
-            request.cookies.get('accessToken')?.value
+        if (auth.response) return auth.response
 
-        if (!accessToken) {
-            return NextResponse.json(
-                {
-                    success: false,
-                    message: 'กรุณาเข้าสู่ระบบใหม่อีกครั้ง',
-                },
-                { status: 401 }
-            )
-        }
-
-        const payload = await safeVerifyToken(accessToken)
-
-        if (!payload?.id) {
-            return NextResponse.json(
-                {
-                    success: false,
-                    message: 'Token ไม่ถูกต้อง',
-                },
-                { status: 401 }
-            )
-        }
-
-        const userId = payload.id
-        const role = payload.permission_role || 'Employee'
-
-        if (!['Admin', 'Manager'].includes(role)) {
-            return NextResponse.json(
-                {
-                    success: false,
-                    message: 'คุณไม่มีสิทธิ์ลบโปรเจกต์',
-                },
-                { status: 403 }
-            )
-        }
+        const userId = auth.user.id
 
         const [projectRows] = await db.execute(
             `

@@ -1,10 +1,14 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/app/lib/db'
-import { safeVerifyToken } from '@/app/lib/verifiedToken'
+import {
+    hasTaskRelatedAccess,
+    hasTaskWideAccess,
+    requirePermission,
+} from '@/app/lib/permission'
 
 export const dynamic = 'force-dynamic'
 
-function buildTaskScope(role, userId) {
+function buildTaskScope(user) {
     const where = [
         't.deleted_at IS NULL',
         'p.deleted_at IS NULL',
@@ -12,39 +16,43 @@ function buildTaskScope(role, userId) {
 
     const values = []
 
-    if (!['Admin', 'Manager'].includes(role)) {
-        if (role === 'Team Lead') {
-            where.push(`
-                (
-                    t.created_by = ?
-                    OR EXISTS (
-                        SELECT 1
-                        FROM project_member pm
-                        WHERE pm.project_id = t.project_id
-                        AND pm.user_id = ?
-                    )
-                    OR EXISTS (
-                        SELECT 1
-                        FROM task_assignment ta
-                        WHERE ta.task_id = t.task_id
-                        AND ta.user_id = ?
-                    )
-                )
-            `)
+    const userId = user.id
+    const canViewAll = hasTaskWideAccess(user)
+    const canViewRelated = hasTaskRelatedAccess(user)
 
-            values.push(userId, userId, userId)
-        } else {
-            where.push(`
-                EXISTS (
+    if (!canViewAll && canViewRelated) {
+        where.push(`
+            (
+                t.created_by = ?
+                OR EXISTS (
+                    SELECT 1
+                    FROM project_member pm
+                    WHERE pm.project_id = t.project_id
+                    AND pm.user_id = ?
+                )
+                OR EXISTS (
                     SELECT 1
                     FROM task_assignment ta
                     WHERE ta.task_id = t.task_id
                     AND ta.user_id = ?
                 )
-            `)
+            )
+        `)
 
-            values.push(userId)
-        }
+        values.push(userId, userId, userId)
+    }
+
+    if (!canViewAll && !canViewRelated) {
+        where.push(`
+            EXISTS (
+                SELECT 1
+                FROM task_assignment ta
+                WHERE ta.task_id = t.task_id
+                AND ta.user_id = ?
+            )
+        `)
+
+        values.push(userId)
     }
 
     return {
@@ -55,35 +63,16 @@ function buildTaskScope(role, userId) {
 
 export async function GET(request) {
     try {
-        const accessToken =
-            request.cookies.get('accessToken')?.value
+        const auth = await requirePermission(
+            request,
+            'dashboard.view'
+        )
 
-        if (!accessToken) {
-            return NextResponse.json(
-                {
-                    success: false,
-                    message: 'Unauthorized',
-                },
-                { status: 401 }
-            )
-        }
+        if (auth.response) return auth.response
 
-        const payload = await safeVerifyToken(accessToken)
-
-        if (!payload?.id) {
-            return NextResponse.json(
-                {
-                    success: false,
-                    message: 'Token ไม่ถูกต้อง',
-                },
-                { status: 401 }
-            )
-        }
-
-        const userId = payload.id
-        const role = payload.permission_role || 'Employee'
-
-        const taskScope = buildTaskScope(role, userId)
+        const user = auth.user
+        const userId = user.id
+        const taskScope = buildTaskScope(user)
 
         const [[employeeStats]] = await db.execute(
             `

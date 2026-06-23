@@ -8,167 +8,196 @@ import {
     FiBell,
     FiActivity,
     FiCalendar,
-    FiClock
+    FiClock,
+    FiShield,
 } from 'react-icons/fi'
 
-export const navItems = [
+export const navGroups = [
     {
-        label: 'ภาพรวม',
-        icon: FiHome,
-        href: '/dashboard',
-        permission: ['Admin', 'Manager', 'Team Lead', 'Employee'],
-    },
-
-    {
-        label: 'การแจ้งเตือน',
-        icon: FiBell,
-        href: '/dashboard/notification',
-        permission: ['Admin', 'Manager', 'Team Lead', 'Employee'],
-    },
-
-    {
-        label: 'Activity Log',
-        icon: FiActivity,
-        href: '/dashboard/activity',
-        permission: ['Admin', 'Manager', 'Team Lead'],
-    },
-
-    {
-        label: 'การลา',
-        icon: FiCalendar,
-        href: '/dashboard/leave',
-        permission: ['Admin', 'Manager', 'Team Lead', 'Employee'],
-    },
-
-    {
-        label: 'Attendance',
-        icon: FiClock,
-        href: '/dashboard/attendance',
-        permission: ['Admin', 'Manager', 'Team Lead', 'Employee'],
-    },
-
-    {
-        label: 'พนักงาน',
-        icon: FiUsers,
-        href: '/dashboard/employee',
-        permission: ['Admin'],
-        subMenu: [
+        label: 'หลัก',
+        items: [
             {
-                label: 'ข้อมูลพนักงาน',
+                label: 'ภาพรวม',
+                icon: FiHome,
+                href: '/dashboard',
+                permissionKey: 'dashboard.view',
+            },
+            {
+                label: 'การแจ้งเตือน',
+                icon: FiBell,
+                href: '/dashboard/notification',
+                permissionKey: 'notification.view',
+            },
+        ],
+    },
+
+    {
+        label: 'HR',
+        items: [
+            {
+                label: 'พนักงาน',
+                icon: FiUsers,
                 href: '/dashboard/employee',
-                permission: ['Admin'],
+                permissionKey: 'employee.view',
+                subMenu: [
+                    {
+                        label: 'ข้อมูลพนักงาน',
+                        href: '/dashboard/employee',
+                        permissionKey: 'employee.view',
+                    },
+                    {
+                        label: 'เพิ่มพนักงาน',
+                        href: '/dashboard/employee/new',
+                        permissionKey: 'employee.create',
+                    },
+                ],
             },
             {
-                label: 'เพิ่มพนักงาน',
-                href: '/dashboard/employee/new',
-                permission: ['Admin'],
+                label: 'การลา',
+                icon: FiCalendar,
+                href: '/dashboard/leave',
+                permissionKey: 'leave.view',
+            },
+            {
+                label: 'Attendance',
+                icon: FiClock,
+                href: '/dashboard/attendance',
+                permissionKey: 'attendance.view',
             },
         ],
     },
 
     {
-        label: 'โปรเจกต์',
-        icon: FiFolder,
-        href: '/dashboard/project',
-        permission: ['Admin', 'Manager', 'Team Lead', 'Employee'],
-        subMenu: [
+        label: 'งานและโปรเจกต์',
+        items: [
             {
-                label: 'รายการโปรเจกต์',
+                label: 'โปรเจกต์',
+                icon: FiFolder,
                 href: '/dashboard/project',
-                permission: ['Admin', 'Manager', 'Team Lead'],
+                permissionKey: 'project.view',
+                subMenu: [
+                    {
+                        label: 'รายการโปรเจกต์',
+                        href: '/dashboard/project',
+                        permissionKey: 'project.view',
+                    },
+                    {
+                        label: 'โปรเจกต์ของฉัน',
+                        href: '/dashboard/project/my-project',
+                        permissionKey: 'project.view',
+                    },
+                    {
+                        label: 'Gantt Chart',
+                        href: '/dashboard/project/gantt',
+                        permissionKey: 'project.view',
+                    },
+                    {
+                        label: 'สร้างโปรเจกต์',
+                        href: '/dashboard/project/new',
+                        permissionKey: 'project.create',
+                    },
+                ],
             },
             {
-                label: 'โปรเจกต์ของฉัน',
-                href: '/dashboard/project/my-project',
-                permission: ['Admin', 'Manager', 'Team Lead', 'Employee'],
-            },
-            {
-                label: 'Gantt Chart',
-                href: '/dashboard/project/gantt',
-                permission: ['Admin', 'Manager', 'Team Lead', 'Employee'],
-            },
-            {
-                label: 'สร้างโปรเจกต์',
-                href: '/dashboard/project/new',
-                permission: ['Admin', 'Manager'],
-            },
-        ],
-    },
-
-    {
-        label: 'งาน',
-        icon: FiCheckSquare,
-        href: '/dashboard/task',
-        permission: ['Admin', 'Manager', 'Team Lead', 'Employee'],
-        subMenu: [
-            {
-                label: 'Dashboard งาน',
+                label: 'งาน',
+                icon: FiCheckSquare,
                 href: '/dashboard/task',
-                permission: ['Admin', 'Manager', 'Team Lead', 'Employee'],
-            },
-            {
-                label: 'งานทั้งหมด',
-                href: '/dashboard/task/list',
-                permission: ['Admin', 'Manager', 'Team Lead'],
-            },
-            {
-                label: 'งานของฉัน',
-                href: '/dashboard/task/my-task',
-                permission: ['Admin', 'Manager', 'Team Lead', 'Employee'],
-            },
-            {
-                label: 'Kanban Board',
-                href: '/dashboard/task/board',
-                permission: ['Admin', 'Manager', 'Team Lead', 'Employee'],
-            },
-            {
-                label: 'เพิ่มงาน',
-                href: '/dashboard/task/new',
-                permission: ['Admin', 'Manager', 'Team Lead'],
+                permissionKey: 'task.view',
+                subMenu: [
+                    {
+                        label: 'Dashboard งาน',
+                        href: '/dashboard/task',
+                        permissionKey: 'task.view',
+                    },
+                    {
+                        label: 'งานทั้งหมด',
+                        href: '/dashboard/task/list',
+                        permissionKey: 'task.view',
+                    },
+                    {
+                        label: 'งานของฉัน',
+                        href: '/dashboard/task/my-task',
+                        permissionKey: 'task.view',
+                    },
+                    {
+                        label: 'Kanban Board',
+                        href: '/dashboard/task/board',
+                        permissionKey: 'task.view',
+                    },
+                    {
+                        label: 'เพิ่มงาน',
+                        href: '/dashboard/task/new',
+                        permissionKey: 'task.create',
+                    },
+                ],
             },
         ],
     },
 
     {
-        label: 'รายงาน',
-        icon: FiBarChart2,
-        href: '/dashboard/report',
-        permission: ['Admin', 'Manager'],
-        subMenu: [
+        label: 'รายงานและตรวจสอบ',
+        items: [
             {
-                label: 'รายงานภาพรวม',
+                label: 'รายงาน',
+                icon: FiBarChart2,
                 href: '/dashboard/report',
-                permission: ['Admin', 'Manager'],
+                permissionKey: 'report.view',
+                subMenu: [
+                    {
+                        label: 'รายงานภาพรวม',
+                        href: '/dashboard/report',
+                        permissionKey: 'report.view',
+                    },
+                ],
+            },
+            {
+                label: 'Activity Log',
+                icon: FiActivity,
+                href: '/dashboard/activity',
+                permissionKey: 'activity.view',
             },
         ],
     },
 
     {
-        label: 'ตั้งค่า',
-        icon: FiSettings,
-        href: '/dashboard/setting',
-        permission: ['Admin'],
-        subMenu: [
+        label: 'ผู้ดูแลระบบ',
+        items: [
             {
-                label: 'ตั้งค่าระบบ',
+                label: 'Permission',
+                icon: FiShield,
+                href: '/dashboard/permission',
+                permissionKey: 'permission.view',
+            },
+            {
+                label: 'ตั้งค่า',
+                icon: FiSettings,
                 href: '/dashboard/setting',
-                permission: ['Admin'],
-            },
-            {
-                label: 'แผนก',
-                href: '/dashboard/setting/department',
-                permission: ['Admin'],
-            },
-            {
-                label: 'ตำแหน่ง',
-                href: '/dashboard/setting/role',
-                permission: ['Admin'],
-            },
-            {
-                label: 'สิทธิ์ผู้ใช้',
-                href: '/dashboard/setting/permission',
-                permission: ['Admin'],
+                permissionKey: 'permission.manage',
+                subMenu: [
+                    {
+                        label: 'ตั้งค่าระบบ',
+                        href: '/dashboard/setting',
+                        permissionKey: 'permission.manage',
+                    },
+                    {
+                        label: 'แผนก',
+                        href: '/dashboard/setting/department',
+                        permissionKey: 'permission.manage',
+                    },
+                    {
+                        label: 'ตำแหน่ง',
+                        href: '/dashboard/setting/role',
+                        permissionKey: 'permission.manage',
+                    },
+                    {
+                        label: 'สิทธิ์ผู้ใช้',
+                        href: '/dashboard/setting/permission',
+                        permissionKey: 'permission.manage',
+                    },
+                ],
             },
         ],
     },
 ]
+
+export const navItems = navGroups.flatMap((group) => group.items)

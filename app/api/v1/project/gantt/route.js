@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/app/lib/db'
-import { safeVerifyToken } from '@/app/lib/verifiedToken'
+import {
+    hasProjectWideAccess,
+    requirePermission,
+} from '@/app/lib/permission'
 
 export const dynamic = 'force-dynamic'
 
@@ -13,8 +16,7 @@ const validProjectStatus = [
 ]
 
 function buildProjectWhere({
-    userId,
-    role,
+    user,
     isAdminView,
     filters,
 }) {
@@ -23,9 +25,10 @@ function buildProjectWhere({
     ]
 
     const values = []
+    const userId = user.id
 
     const isAdminScope =
-        isAdminView && ['Admin', 'Manager'].includes(role)
+        isAdminView && hasProjectWideAccess(user)
 
     if (!isAdminScope) {
         where.push(`
@@ -105,12 +108,12 @@ function buildProjectWhere({
 }
 
 async function getAvailableProjects({
-    userId,
-    role,
+    user,
     isAdminView,
 }) {
+    const userId = user.id
     const isAdminScope =
-        isAdminView && ['Admin', 'Manager'].includes(role)
+        isAdminView && hasProjectWideAccess(user)
 
     if (isAdminScope) {
         const [rows] = await db.execute(`
@@ -154,41 +157,21 @@ async function getAvailableProjects({
 
 export async function GET(request) {
     try {
-        const accessToken =
-            request.cookies.get('accessToken')?.value
+        const auth = await requirePermission(
+            request,
+            'project.view'
+        )
 
-        if (!accessToken) {
-            return NextResponse.json(
-                {
-                    success: false,
-                    message: 'กรุณาเข้าสู่ระบบใหม่อีกครั้ง',
-                },
-                { status: 401 }
-            )
-        }
+        if (auth.response) return auth.response
 
-        const payload = safeVerifyToken(accessToken)
-
-        if (!payload?.id) {
-            return NextResponse.json(
-                {
-                    success: false,
-                    message: 'Token ไม่ถูกต้อง',
-                },
-                { status: 401 }
-            )
-        }
-
-        const userId = payload.id
-        const role = payload.permission_role || 'Employee'
+        const user = auth.user
 
         const { searchParams } = new URL(request.url)
 
         const requestedView =
             searchParams.get('view') || 'mine'
 
-        const canViewAdmin =
-            ['Admin', 'Manager'].includes(role)
+        const canViewAdmin = hasProjectWideAccess(user)
 
         const viewMode =
             requestedView === 'admin' && canViewAdmin
@@ -207,8 +190,7 @@ export async function GET(request) {
         }
 
         const projectWhere = buildProjectWhere({
-            userId,
-            role,
+            user,
             isAdminView,
             filters,
         })
@@ -332,14 +314,12 @@ export async function GET(request) {
 
         const availableProjects =
             await getAvailableProjects({
-                userId,
-                role,
+                user,
                 isAdminView,
             })
 
         return NextResponse.json({
             success: true,
-            role,
             view_mode: viewMode,
             can_view_admin: canViewAdmin,
             projects: projectRows,

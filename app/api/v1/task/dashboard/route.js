@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/app/lib/db'
-import { safeVerifyToken } from '@/app/lib/verifiedToken'
+import {
+    hasTaskWideAccess,
+    requirePermission,
+} from '@/app/lib/permission'
 
 export const dynamic = 'force-dynamic'
 
@@ -175,32 +178,15 @@ async function getAvailableProjects({
 
 export async function GET(request) {
     try {
-        const accessToken =
-            request.cookies.get('accessToken')?.value
+        const auth = await requirePermission(
+            request,
+            'task.view'
+        )
 
-        if (!accessToken) {
-            return NextResponse.json(
-                {
-                    success: false,
-                    message: 'กรุณาเข้าสู่ระบบใหม่อีกครั้ง',
-                },
-                { status: 401 }
-            )
-        }
+        if (auth.response) return auth.response
 
-        const payload = safeVerifyToken(accessToken)
-
-        if (!payload?.id) {
-            return NextResponse.json(
-                {
-                    success: false,
-                    message: 'Token ไม่ถูกต้อง',
-                },
-                { status: 401 }
-            )
-        }
-
-        const userId = payload.id
+        const user = auth.user
+        const userId = user.id
 
         const { searchParams } =
             new URL(request.url)
@@ -208,10 +194,7 @@ export async function GET(request) {
         const requestedView =
             searchParams.get('view') || 'mine'
 
-        const canViewAdmin =
-            ['Admin', 'Manager'].includes(
-                payload.permission_role
-            )
+        const canViewAdmin = hasTaskWideAccess(user)
 
         const viewMode =
             requestedView === 'admin' && canViewAdmin

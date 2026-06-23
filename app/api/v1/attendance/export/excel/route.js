@@ -7,6 +7,7 @@ import {
     getAttendanceExportFilters,
     getAttendanceStatusLabel,
 } from '@/app/lib/attendanceExportData'
+import { requirePermission } from '@/app/lib/permission'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -121,21 +122,15 @@ function addAttendanceSheet(workbook, rows) {
 
 export async function GET(request) {
     try {
-        const user = await getAttendanceExportAuthUser(request)
+        const auth = await requirePermission(
+            request,
+            'attendance.export'
+        )
 
-        if (!user) {
-            return NextResponse.json(
-                { success: false, message: 'Unauthorized' },
-                { status: 401 }
-            )
-        }
+        if (auth.response) return auth.response
 
-        if (!canExportAttendance(user)) {
-            return NextResponse.json(
-                { success: false, message: 'ไม่มีสิทธิ์ Export Attendance' },
-                { status: 403 }
-            )
-        }
+        const user = auth.user
+
 
         const filters = getAttendanceExportFilters(request)
 

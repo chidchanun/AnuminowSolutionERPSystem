@@ -1,37 +1,44 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/app/lib/db'
-import { safeVerifyToken } from '@/app/lib/verifiedToken'
+import {
+    hasAnyPermission,
+    requirePermission,
+} from '@/app/lib/permission'
+
+export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
+
+const allowedProjectStatus = [
+    'planning',
+    'active',
+    'completed',
+    'cancelled',
+]
 
 export async function GET(request) {
     try {
-        const accessToken =
-            request.cookies.get('accessToken')?.value
+        const auth = await requirePermission(
+            request,
+            'project.view'
+        )
 
-        if (!accessToken) {
-            return NextResponse.json(
-                { message: 'Unauthorized' },
-                { status: 401 }
-            )
-        }
+        if (auth.response) return auth.response
 
-        const payload =
-            safeVerifyToken(accessToken)
+        const user = auth.user
 
-        if (!payload) {
-            return NextResponse.json(
-                { message: 'Unauthorized' },
-                { status: 401 }
-            )
-        }
+        const canViewAllProjects = await hasAnyPermission(
+            user.id,
+            [
+                'project.create',
+                'project.update',
+                'project.delete',
+            ]
+        )
 
         let sql = ''
         let params = []
 
-        if (
-            ['Admin', 'Manager'].includes(
-                payload.permission_role
-            )
-        ) {
+        if (canViewAllProjects) {
             sql = `
                 SELECT
                     p.project_id,
@@ -45,7 +52,7 @@ export async function GET(request) {
                     u.first_name_th,
                     u.last_name_th
                 FROM project p
-                INNER JOIN user u
+                INNER JOIN \`user\` u
                     ON p.created_by = u.id
                 WHERE p.deleted_at IS NULL
                 ORDER BY p.project_id DESC
@@ -64,76 +71,69 @@ export async function GET(request) {
                     u.first_name_th,
                     u.last_name_th
                 FROM project p
-                INNER JOIN user u
+                INNER JOIN \`user\` u
                     ON p.created_by = u.id
                 INNER JOIN project_member pm
                     ON p.project_id = pm.project_id
-                WHERE
-                    p.deleted_at IS NULL
-                    AND pm.user_id = ?
+                WHERE p.deleted_at IS NULL
+                AND pm.user_id = ?
                 ORDER BY p.project_id DESC
             `
 
-            params = [payload.id]
+            params = [user.id]
         }
 
-        const [projects] =
-            await db.execute(sql, params)
+        const [projects] = await db.execute(sql, params)
 
         return NextResponse.json({
+            success: true,
             message: 'ok',
-            status: 200,
             projects,
+            permission: {
+                can_view_all: canViewAllProjects,
+            },
         })
     } catch (error) {
-        console.error(error)
+        console.error('Project GET Error:', error)
 
         return NextResponse.json(
             {
-                message: 'Internal Server Error',
+                success: false,
+                message: 'โหลดโปรเจกต์ไม่สำเร็จ',
+                error_detail:
+                    process.env.NODE_ENV === 'development'
+                        ? error.message
+                        : undefined,
             },
-            {
-                status: 500,
-            }
+            { status: 500 }
         )
     }
 }
-
 
 export async function POST(request) {
     let connection
 
     try {
+        const auth = await requirePermission(
+            request,
+            'project.create'
+        )
 
-        const accessToken =
-            request.cookies.get('accessToken')?.value
+        if (auth.response) return auth.response
 
-        if (!accessToken) {
+        const user = auth.user
+
+        const body = await request.json().catch(() => null)
+
+        if (!body) {
             return NextResponse.json(
                 {
-                    message: 'โปรดเข้าสู่ระบบใหม่อีกครั้ง'
+                    success: false,
+                    message: 'รูปแบบข้อมูลไม่ถูกต้อง',
                 },
-                {
-                    status: 401
-                }
+                { status: 400 }
             )
         }
-
-        const payload =
-            safeVerifyToken(accessToken)
-
-        if (!payload) {
-            return NextResponse.json(
-                {
-                    message: 'โปรดเข้าสู่ระบบใหม่อีกครั้ง'
-                },
-                {
-                    status: 401
-                }
-            )
-        }
-
-        const body = await request.json()
 
         const {
             project_name,
@@ -142,20 +142,26 @@ export async function POST(request) {
             start_date,
             end_date,
             status = 'planning',
-            member_ids = []
+            member_ids = [],
         } = body
 
-        if (
-            !project_name ||
-            !project_code
-        ) {
+        if (!project_name || !project_code) {
             return NextResponse.json(
                 {
-                    message: 'กรุณากรอกข้อมูลให้ครบถ้วน'
+                    success: false,
+                    message: 'กรุณากรอกข้อมูลให้ครบถ้วน',
                 },
+                { status: 400 }
+            )
+        }
+
+        if (!allowedProjectStatus.includes(status)) {
+            return NextResponse.json(
                 {
-                    status: 400
-                }
+                    success: false,
+                    message: 'สถานะโปรเจกต์ไม่ถูกต้อง',
+                },
+                { status: 400 }
             )
         }
 
@@ -165,6 +171,7 @@ export async function POST(request) {
             FROM project
             WHERE project_code = ?
             AND deleted_at IS NULL
+            LIMIT 1
             `,
             [project_code]
         )
@@ -172,68 +179,62 @@ export async function POST(request) {
         if (exists.length > 0) {
             return NextResponse.json(
                 {
-                    message:
-                        'รหัสโปรเจกต์นี้ถูกใช้งานแล้ว'
+                    success: false,
+                    message: 'รหัสโปรเจกต์นี้ถูกใช้งานแล้ว',
                 },
-                {
-                    status: 400
-                }
+                { status: 409 }
             )
         }
 
-        connection =
-            await db.getConnection()
-
+        connection = await db.getConnection()
         await connection.beginTransaction()
 
-        const [result] =
-            await connection.execute(
-                `
-                INSERT INTO project
-                (
-                    project_name,
-                    project_code,
-                    description,
-                    start_date,
-                    end_date,
-                    status,
-                    created_by
-                )
-                VALUES
-                (?, ?, ?, ?, ?, ?, ?)
-                `,
-                [
-                    project_name,
-                    project_code,
-                    description,
-                    start_date || null,
-                    end_date || null,
-                    status,
-                    payload.id
-                ]
+        const [result] = await connection.execute(
+            `
+            INSERT INTO project (
+                project_name,
+                project_code,
+                description,
+                start_date,
+                end_date,
+                status,
+                created_by
             )
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            `,
+            [
+                project_name,
+                project_code,
+                description || null,
+                start_date || null,
+                end_date || null,
+                status,
+                user.id,
+            ]
+        )
 
-        const projectId =
-            result.insertId
+        const projectId = result.insertId
+
+        const cleanMemberIds = Array.isArray(member_ids)
+            ? member_ids
+                  .map((item) => String(item).trim())
+                  .filter(Boolean)
+            : []
 
         const memberSet = new Set([
-            payload.id,
-            ...(member_ids || [])
+            user.id,
+            ...cleanMemberIds,
         ])
 
-        const values =
-            [...memberSet].map(
-                (userId) => [
-                    projectId,
-                    userId
-                ]
-            )
+        const values = [...memberSet].map((userId) => [
+            projectId,
+            userId,
+        ])
 
         if (values.length > 0) {
             await connection.query(
                 `
-                INSERT INTO project_member
-                (
+                INSERT IGNORE INTO project_member (
                     project_id,
                     user_id
                 )
@@ -245,37 +246,35 @@ export async function POST(request) {
 
         await connection.commit()
 
-        return NextResponse.json({
-            success: true,
-            project_id: projectId,
-            message:
-                'สร้างโปรเจกต์สำเร็จ'
-        })
-
+        return NextResponse.json(
+            {
+                success: true,
+                project_id: projectId,
+                message: 'สร้างโปรเจกต์สำเร็จ',
+            },
+            { status: 201 }
+        )
     } catch (error) {
-
         if (connection) {
-            await connection.rollback()
+        await connection.rollback()
         }
 
-        console.error(error)
+        console.error('Project POST Error:', error)
 
         return NextResponse.json(
             {
                 success: false,
-                message:
-                    'สร้างโปรเจกต์ไม่สำเร็จ'
+                message: 'สร้างโปรเจกต์ไม่สำเร็จ',
+                error_detail:
+                    process.env.NODE_ENV === 'development'
+                        ? error.message
+                        : undefined,
             },
-            {
-                status: 500
-            }
+            { status: 500 }
         )
-
     } finally {
-
         if (connection) {
             connection.release()
         }
-
     }
 }

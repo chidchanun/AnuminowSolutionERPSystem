@@ -4,6 +4,7 @@ import {
     hasPermission,
     requirePermission,
 } from '@/app/lib/permission'
+import { writeAuditLog } from '@/app/lib/auditLog'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -91,6 +92,8 @@ export async function PUT(request) {
         )
 
         if (auth.response) return auth.response
+
+        const user = auth.user
 
         const body = await request.json().catch(() => null)
 
@@ -193,6 +196,20 @@ export async function PUT(request) {
                 )
             }
         }
+
+        await writeAuditLog({
+            connection,
+            actorId: user.id,
+            action: 'permission_matrix.update',
+            entityType: 'permission_role',
+            entityId: permissionRoleId,
+            summary: `Update permissions for ${targetRole.permission_role_name}`,
+            metadata: {
+                permission_role_name:
+                    targetRole.permission_role_name,
+                permission_ids: permissionIds,
+            },
+        })
 
         await connection.commit()
 

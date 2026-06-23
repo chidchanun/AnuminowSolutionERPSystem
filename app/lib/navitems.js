@@ -156,6 +156,12 @@ export const navGroups = [
                 href: '/dashboard/activity',
                 permissionKey: 'activity.view',
             },
+            {
+                label: 'Audit Log',
+                icon: FiShield,
+                href: '/dashboard/audit-log',
+                permissionKey: 'audit.view',
+            },
         ],
     },
 

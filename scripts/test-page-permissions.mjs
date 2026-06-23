@@ -45,6 +45,7 @@ const {
 test('getPagePermission resolves static dashboard routes', () => {
     assert.equal(getPagePermission('/dashboard'), 'dashboard.view')
     assert.equal(getPagePermission('/dashboard/activity'), 'activity.view')
+    assert.equal(getPagePermission('/dashboard/audit-log'), 'audit.view')
     assert.equal(getPagePermission('/dashboard/report'), 'report.view')
     assert.equal(
         getPagePermission('/dashboard/permission'),

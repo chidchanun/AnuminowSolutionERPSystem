@@ -52,6 +52,10 @@ const pagePermissionRules = [
         permissionKey: 'activity.view',
     },
     {
+        pattern: /^\/dashboard\/audit-log\/?$/,
+        permissionKey: 'audit.view',
+    },
+    {
         pattern: /^\/dashboard\/notification\/?$/,
         permissionKey: 'notification.view',
     },

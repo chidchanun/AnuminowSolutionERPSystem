@@ -6,6 +6,7 @@ import {
 } from '@/app/lib/permission'
 import path from 'path'
 import { unlink } from 'fs/promises'
+import { writeAuditLog } from '@/app/lib/auditLog'
 
 export const runtime = 'nodejs'
 
@@ -165,6 +166,19 @@ export async function DELETE(request, { params }) {
                 user.id,
             ]
         )
+
+        await writeAuditLog({
+            connection,
+            actorId: user.id,
+            action: 'task.attachment.delete',
+            entityType: 'task_attachment',
+            entityId: attachmentId,
+            summary: `Delete attachment ${attachment.original_name}`,
+            metadata: {
+                task_id: attachment.task_id,
+                original_name: attachment.original_name,
+            },
+        })
 
         await connection.commit()
 

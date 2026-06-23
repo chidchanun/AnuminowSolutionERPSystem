@@ -8,6 +8,7 @@ import {
 } from '@/app/lib/permission'
 import { createNotifications } from '@/app/lib/notification'
 import { emitNotificationToUsers } from '@/app/lib/socketEmit'
+import { writeAuditLog } from '@/app/lib/auditLog'
 
 export const dynamic = 'force-dynamic'
 
@@ -652,6 +653,22 @@ export async function PUT(request, context) {
             )
         }
 
+        await writeAuditLog({
+            connection,
+            actorId: userId,
+            action: 'task.update',
+            entityType: 'task',
+            entityId: taskId,
+            summary: `Update task ${task_name}`,
+            metadata: {
+                project_id,
+                priority,
+                status,
+                assignee_ids: newAssigneeIds,
+                changed_fields: historyValues.map((item) => item[2] || item[1]),
+            },
+        })
+
         await connection.commit()
 
         await emitNotificationToUsers(notificationTargetUserIds)
@@ -822,6 +839,19 @@ export async function DELETE(request, context) {
                 userId,
             ]
         )
+
+        await writeAuditLog({
+            connection,
+            actorId: userId,
+            action: 'task.delete',
+            entityType: 'task',
+            entityId: taskId,
+            summary: `Delete task ${task.task_name}`,
+            metadata: {
+                project_id: task.project_id,
+                task_name: task.task_name,
+            },
+        })
 
         await connection.commit()
 

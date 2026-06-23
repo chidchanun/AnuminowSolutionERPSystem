@@ -22,6 +22,7 @@ const mockState = {
     projectWideAccess: false,
     executeQueue: [],
     executeCalls: [],
+    auditLogCalls: [],
     connection: null,
 }
 
@@ -34,6 +35,7 @@ function resetMockState() {
     mockState.projectWideAccess = false
     mockState.executeQueue = []
     mockState.executeCalls = []
+    mockState.auditLogCalls = []
     mockState.connection = createMockConnection()
 }
 
@@ -151,6 +153,13 @@ async function loadRouteModule(source, identifier) {
         } else if (specifier === '@/app/lib/db') {
             vmModule = await createMockModule(specifier, {
                 db: mockDb,
+            })
+        } else if (specifier === '@/app/lib/auditLog') {
+            vmModule = await createMockModule(specifier, {
+                async writeAuditLog(payload) {
+                    mockState.auditLogCalls.push(payload)
+                    return true
+                },
             })
         } else if (specifier === '@/app/lib/permission') {
             vmModule = await createMockModule(specifier, {

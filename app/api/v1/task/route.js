@@ -7,6 +7,7 @@ import {
 } from '@/app/lib/permission'
 import { createNotifications } from '@/app/lib/notification'
 import { emitNotificationToUsers } from '@/app/lib/socketEmit'
+import { writeAuditLog } from '@/app/lib/auditLog'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -727,6 +728,21 @@ export async function POST(request) {
             `,
             [historyValues]
         )
+
+        await writeAuditLog({
+            connection,
+            actorId: userId,
+            action: 'task.create',
+            entityType: 'task',
+            entityId: taskId,
+            summary: `Create task ${task_name}`,
+            metadata: {
+                project_id: projectId,
+                priority,
+                status,
+                assignee_ids: cleanAssigneeIds,
+            },
+        })
 
         await connection.commit()
 

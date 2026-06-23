@@ -1,6 +1,6 @@
 export const metadata = {
-    title: 'Personal Task | Anuminow Solution ERP',
-    description: 'ระบบแสดงงานของพนักงาน',
+    title: 'Task Dashboard | Anuminow Solution ERP',
+    description: 'ภาพรวมงาน ลำดับความสำคัญ และรายการที่ต้องดำเนินการ',
     robots: 'index, follow',
 }
 

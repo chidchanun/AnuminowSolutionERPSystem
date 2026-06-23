@@ -1,225 +1,171 @@
+const headerRules = [
+    {
+        pattern: /^\/dashboard\/?$/,
+        title: 'Dashboard',
+        welcome: 'ภาพรวมระบบ ERP',
+    },
+    {
+        pattern: /^\/dashboard\/notification\/?$/,
+        title: 'Notifications',
+        welcome: 'ติดตามการแจ้งเตือนและรายการที่ต้องรับทราบ',
+    },
+    {
+        pattern: /^\/dashboard\/employee\/new\/?$/,
+        title: 'Create Employee',
+        welcome: 'เพิ่มข้อมูลพนักงานใหม่เข้าสู่ระบบ',
+    },
+    {
+        pattern: /^\/dashboard\/employee\/[^/]+\/edit\/?$/,
+        title: 'Edit Employee',
+        welcome: 'แก้ไขข้อมูลพนักงานและสิทธิ์ที่เกี่ยวข้อง',
+    },
+    {
+        pattern: /^\/dashboard\/employee\/[^/]+\/?$/,
+        title: 'Employee Detail',
+        welcome: 'ตรวจสอบข้อมูลพนักงาน โครงการ และกิจกรรมล่าสุด',
+    },
+    {
+        pattern: /^\/dashboard\/employee\/?$/,
+        title: 'Employees',
+        welcome: 'จัดการข้อมูลพนักงาน แผนก ตำแหน่ง และสถานะการทำงาน',
+    },
+    {
+        pattern: /^\/dashboard\/leave\/?$/,
+        title: 'Leave Requests',
+        welcome: 'ส่งคำขอลา ตรวจสอบสถานะ และอนุมัติรายการตามสิทธิ์',
+    },
+    {
+        pattern: /^\/dashboard\/attendance\/?$/,
+        title: 'Attendance',
+        welcome: 'ตรวจสอบและบันทึกข้อมูลการเข้างานของพนักงาน',
+    },
+    {
+        pattern: /^\/dashboard\/project\/gantt\/?$/,
+        title: 'Project Gantt Chart',
+        welcome: 'ดูแผนงาน ระยะเวลา และความคืบหน้าของโครงการ',
+    },
+    {
+        pattern: /^\/dashboard\/project\/my-project\/?$/,
+        title: 'My Projects',
+        welcome: 'โครงการที่คุณเกี่ยวข้องและงานที่ต้องติดตาม',
+    },
+    {
+        pattern: /^\/dashboard\/project\/new\/?$/,
+        title: 'Create Project',
+        welcome: 'สร้างโครงการใหม่ กำหนดรายละเอียด และเพิ่มสมาชิก',
+    },
+    {
+        pattern: /^\/dashboard\/project\/[^/]+\/edit\/?$/,
+        title: 'Edit Project',
+        welcome: 'แก้ไขรายละเอียดโครงการและสมาชิกที่เกี่ยวข้อง',
+    },
+    {
+        pattern: /^\/dashboard\/project\/[^/]+\/?$/,
+        title: 'Project Detail',
+        welcome: 'รายละเอียดโครงการ งาน สมาชิก และความคืบหน้า',
+    },
+    {
+        pattern: /^\/dashboard\/project\/?$/,
+        title: 'Projects',
+        welcome: 'จัดการโครงการ สถานะ และทีมที่รับผิดชอบ',
+    },
+    {
+        pattern: /^\/dashboard\/task\/board\/?$/,
+        title: 'Kanban Board',
+        welcome: 'ติดตามงานตามสถานะบนบอร์ด',
+    },
+    {
+        pattern: /^\/dashboard\/task\/list\/?$/,
+        title: 'All Tasks',
+        welcome: 'รายการงานทั้งหมดตามสิทธิ์การเข้าถึง',
+    },
+    {
+        pattern: /^\/dashboard\/task\/my-task\/?$/,
+        title: 'My Tasks',
+        welcome: 'งานที่คุณได้รับมอบหมายและต้องติดตาม',
+    },
+    {
+        pattern: /^\/dashboard\/task\/new\/?$/,
+        title: 'Create Task',
+        welcome: 'สร้างงานใหม่ กำหนดผู้รับผิดชอบ และวันครบกำหนด',
+    },
+    {
+        pattern: /^\/dashboard\/task\/[^/]+\/edit\/?$/,
+        title: 'Edit Task',
+        welcome: 'แก้ไขรายละเอียดงาน ผู้รับผิดชอบ และสถานะงาน',
+    },
+    {
+        pattern: /^\/dashboard\/task\/[^/]+\/?$/,
+        title: 'Task Detail',
+        welcome: 'รายละเอียดงาน ความคืบหน้า ความคิดเห็น และไฟล์แนบ',
+    },
+    {
+        pattern: /^\/dashboard\/task\/?$/,
+        title: 'Task Dashboard',
+        welcome: 'ภาพรวมงาน ลำดับความสำคัญ และรายการที่ต้องดำเนินการ',
+    },
+    {
+        pattern: /^\/dashboard\/report\/?$/,
+        title: 'Reports',
+        welcome: 'สรุปข้อมูลโครงการ งาน และประสิทธิภาพการทำงาน',
+    },
+    {
+        pattern: /^\/dashboard\/activity\/?$/,
+        title: 'Activity Log',
+        welcome: 'ตรวจสอบประวัติการเปลี่ยนแปลงและกิจกรรมของงาน',
+    },
+    {
+        pattern: /^\/dashboard\/audit-log\/?$/,
+        title: 'Audit Log',
+        welcome: 'ตรวจสอบประวัติการเปลี่ยนแปลงข้อมูลและสิทธิ์ในระบบ',
+    },
+    {
+        pattern: /^\/dashboard\/permission\/?$/,
+        title: 'Permission Matrix',
+        welcome: 'จัดการสิทธิ์การเข้าถึงของแต่ละ permission role',
+    },
+    {
+        pattern: /^\/dashboard\/setting\/department\/?$/,
+        title: 'Department Setting',
+        welcome: 'จัดการข้อมูลแผนกในองค์กร',
+    },
+    {
+        pattern: /^\/dashboard\/setting\/role\/?$/,
+        title: 'Role Setting',
+        welcome: 'จัดการตำแหน่งงานและบทบาทภายในองค์กร',
+    },
+    {
+        pattern: /^\/dashboard\/setting\/permission\/?$/,
+        title: 'Permission Setting',
+        welcome: 'ตั้งค่าสิทธิ์และบทบาทการใช้งานระบบ',
+    },
+    {
+        pattern: /^\/dashboard\/setting(?:\/.*)?$/,
+        title: 'System Setting',
+        welcome: 'ตั้งค่าข้อมูลพื้นฐานของระบบ ERP',
+    },
+]
+
+function normalizePathname(pathname) {
+    return String(pathname || '')
+        .split('?')[0]
+        .toLowerCase()
+}
+
+function getHeaderRule(pathname) {
+    const normalized = normalizePathname(pathname)
+
+    return headerRules.find((item) =>
+        item.pattern.test(normalized)
+    )
+}
+
 export const getHeaderTitle = (pathname) => {
-    if (!pathname) return 'Dashboard'
-
-    const normalized = pathname.toLowerCase()
-
-    if (normalized === '/dashboard' || normalized === '/dashboard/') {
-        return 'Dashboard'
-    }
-
-    // Employee
-    if (normalized.startsWith('/dashboard/employee/new')) {
-        return 'Create Employee'
-    }
-
-    if (normalized.startsWith('/dashboard/employee')) {
-        return 'Employee Dashboard'
-    }
-
-    // Project
-    if (normalized.startsWith('/dashboard/project/gantt')) {
-        return 'Project Gantt Chart'
-    }
-
-    if (normalized.startsWith('/dashboard/project/new')) {
-        return 'Create Project'
-    }
-
-    if (/^\/dashboard\/project\/\d+\/edit\/?$/.test(normalized)) {
-        return 'Edit Project'
-    }
-
-    if (/^\/dashboard\/project\/\d+\/?$/.test(normalized)) {
-        return 'Project Detail'
-    }
-
-    if (normalized.startsWith('/dashboard/project/my-project')) {
-        return 'My Projects'
-    }
-
-    if (normalized.startsWith('/dashboard/project')) {
-        return 'Project Dashboard'
-    }
-
-    // Task
-    if (normalized.startsWith('/dashboard/task/new')) {
-        return 'Create Task'
-    }
-
-    if (/^\/dashboard\/task\/\d+\/edit\/?$/.test(normalized)) {
-        return 'Edit Task'
-    }
-
-    if (/^\/dashboard\/task\/\d+\/?$/.test(normalized)) {
-        return 'Task Detail'
-    }
-
-    if (normalized.startsWith('/dashboard/task/list')) {
-        return 'All Tasks'
-    }
-
-    if (normalized.startsWith('/dashboard/task/my-task')) {
-        return 'My Tasks'
-    }
-
-    if (normalized.startsWith('/dashboard/task/board')) {
-        return 'Kanban Board'
-    }
-
-    if (normalized.startsWith('/dashboard/task')) {
-        return 'Task Dashboard'
-    }
-
-    // Report
-    if (normalized.startsWith('/dashboard/report/project')) {
-        return 'Project Report'
-    }
-
-    if (normalized.startsWith('/dashboard/report/task')) {
-        return 'Task Report'
-    }
-
-    if (normalized.startsWith('/dashboard/report')) {
-        return 'Report Dashboard'
-    }
-
-    // Setting
-    if (normalized.startsWith('/dashboard/setting/department')) {
-        return 'Department Setting'
-    }
-
-    if (normalized.startsWith('/dashboard/setting/role')) {
-        return 'Role Setting'
-    }
-
-    if (normalized.startsWith('/dashboard/setting/permission')) {
-        return 'Permission Setting'
-    }
-
-    if (normalized.startsWith('/dashboard/setting')) {
-        return 'System Setting'
-    }
-
-    if (normalized.startsWith('/dashboard/district')) {
-        return 'District'
-    }
-
-    if (normalized.startsWith('/dashboard/postal')) {
-        return 'Postal'
-    }
-
-    return 'Dashboard'
+    return getHeaderRule(pathname)?.title || 'Dashboard'
 }
 
 export const getWelcomeText = (pathname) => {
-    if (!pathname) return 'ยินดีต้อนรับกลับ'
-
-    const normalized = pathname.toLowerCase()
-
-    if (normalized === '/dashboard' || normalized === '/dashboard/') {
-        return 'ระบบแดชบอร์ดภาพรวม'
-    }
-
-    // Employee
-    if (normalized.startsWith('/dashboard/employee/new')) {
-        return 'สร้างข้อมูลพนักงานใหม่'
-    }
-
-    if (normalized.startsWith('/dashboard/employee')) {
-        return 'ระบบข้อมูลพนักงาน'
-    }
-
-    // Project
-    if (normalized.startsWith('/dashboard/project/gantt')) {
-        return 'แสดงแผนงานและช่วงเวลาของโปรเจกต์'
-    }
-
-    if (normalized.startsWith('/dashboard/project/new')) {
-        return 'สร้างโปรเจกต์ใหม่'
-    }
-
-    if (/^\/dashboard\/project\/\d+\/edit\/?$/.test(normalized)) {
-        return 'แก้ไขข้อมูลโปรเจกต์'
-    }
-
-    if (/^\/dashboard\/project\/\d+\/?$/.test(normalized)) {
-        return 'รายละเอียดโปรเจกต์'
-    }
-
-    if (normalized.startsWith('/dashboard/project/my-project')) {
-        return 'โปรเจกต์ที่คุณเกี่ยวข้อง'
-    }
-
-    if (normalized.startsWith('/dashboard/project')) {
-        return 'ระบบข้อมูลโปรเจกต์'
-    }
-
-    // Task
-    if (normalized.startsWith('/dashboard/task/new')) {
-        return 'สร้างงานใหม่'
-    }
-
-    if (/^\/dashboard\/task\/\d+\/edit\/?$/.test(normalized)) {
-        return 'แก้ไขข้อมูลงาน'
-    }
-
-    if (/^\/dashboard\/task\/\d+\/?$/.test(normalized)) {
-        return 'รายละเอียดงาน'
-    }
-
-    if (normalized.startsWith('/dashboard/task/list')) {
-        return 'รายการงานทั้งหมดตามสิทธิ์ผู้ใช้งาน'
-    }
-
-    if (normalized.startsWith('/dashboard/task/my-task')) {
-        return 'งานที่คุณได้รับมอบหมาย'
-    }
-
-    if (normalized.startsWith('/dashboard/task/board')) {
-        return 'มุมมองกระดานงาน'
-    }
-
-    if (normalized.startsWith('/dashboard/task')) {
-        return 'ระบบแดชบอร์ดงาน'
-    }
-
-    // Report
-    if (normalized.startsWith('/dashboard/report/project')) {
-        return 'รายงานข้อมูลโปรเจกต์'
-    }
-
-    if (normalized.startsWith('/dashboard/report/task')) {
-        return 'รายงานข้อมูลงาน'
-    }
-
-    if (normalized.startsWith('/dashboard/report')) {
-        return 'ระบบรายงาน'
-    }
-
-    // Setting
-    if (normalized.startsWith('/dashboard/setting/department')) {
-        return 'ตั้งค่าข้อมูลแผนก'
-    }
-
-    if (normalized.startsWith('/dashboard/setting/role')) {
-        return 'ตั้งค่าข้อมูลตำแหน่ง'
-    }
-
-    if (normalized.startsWith('/dashboard/setting/permission')) {
-        return 'ตั้งค่าสิทธิ์การใช้งาน'
-    }
-
-    if (normalized.startsWith('/dashboard/setting')) {
-        return 'ตั้งค่าระบบ'
-    }
-
-    if (normalized.startsWith('/dashboard/district')) {
-        return 'ระบบข้อมูลอำเภอ'
-    }
-
-    if (normalized.startsWith('/dashboard/postal')) {
-        return 'ระบบข้อมูลรหัสไปรษณีย์'
-    }
-
-    return 'ยินดีต้อนรับกลับ'
+    return getHeaderRule(pathname)?.welcome || 'ยินดีต้อนรับกลับ'
 }
+
+export { headerRules }

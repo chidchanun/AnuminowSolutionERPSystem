@@ -54,14 +54,29 @@ function formatDate(value) {
     })
 }
 
+function getConfirmTitle(status) {
+    return status === 'approved'
+        ? 'ยืนยันการอนุมัติคำขอลา'
+        : 'ยืนยันการปฏิเสธคำขอลา'
+}
+
+function getConfirmDescription(status) {
+    return status === 'approved'
+        ? 'เมื่ออนุมัติแล้ว ระบบจะบันทึกวันลาเข้า Attendance ของพนักงาน'
+        : 'เมื่อปฏิเสธแล้ว คำขอนี้จะถูกปิดและไม่สามารถอนุมัติซ้ำได้'
+}
+
 export default function LeavePage() {
     const [leaves, setLeaves] = useState([])
     const [permission, setPermission] = useState({
-        can_manage: false,
+        can_approve: false,
+        current_user_id: null,
     })
     const [status, setStatus] = useState('all')
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
+    const [actionSaving, setActionSaving] = useState(false)
+    const [confirmAction, setConfirmAction] = useState(null)
     const [error, setError] = useState('')
 
     const [formData, setFormData] = useState({
@@ -195,15 +210,9 @@ export default function LeavePage() {
     }
 
     const updateLeaveStatus = async (leaveId, nextStatus) => {
-        const confirmed = window.confirm(
-            nextStatus === 'approved'
-                ? 'ต้องการอนุมัติคำขอนี้หรือไม่?'
-                : 'ต้องการปฏิเสธคำขอนี้หรือไม่?'
-        )
-
-        if (!confirmed) return
-
         try {
+            setActionSaving(true)
+
             const res = await fetch(`/api/v1/leave/${leaveId}`, {
                 method: 'PATCH',
                 headers: {
@@ -225,9 +234,12 @@ export default function LeavePage() {
             }
 
             await loadLeaves()
+            setConfirmAction(null)
         } catch (error) {
             console.error(error)
             setError(error.message)
+        } finally {
+            setActionSaving(false)
         }
     }
 
@@ -422,11 +434,19 @@ export default function LeavePage() {
                                         </div>
 
                                         <div className="flex flex-wrap gap-2">
-                                            {permission.can_manage && leave.status === 'pending' && (
+                                            {permission.can_approve &&
+                                                leave.status === 'pending' &&
+                                                String(leave.user_id) !==
+                                                    String(permission.current_user_id) && (
                                                 <>
                                                     <button
                                                         type="button"
-                                                        onClick={() => updateLeaveStatus(leave.leave_id, 'approved')}
+                                                        onClick={() =>
+                                                            setConfirmAction({
+                                                                leave,
+                                                                status: 'approved',
+                                                            })
+                                                        }
                                                         className="inline-flex items-center gap-2 rounded-2xl bg-green-500 px-4 py-2 text-sm text-white hover:bg-green-600"
                                                     >
                                                         <FiCheck />
@@ -435,7 +455,12 @@ export default function LeavePage() {
 
                                                     <button
                                                         type="button"
-                                                        onClick={() => updateLeaveStatus(leave.leave_id, 'rejected')}
+                                                        onClick={() =>
+                                                            setConfirmAction({
+                                                                leave,
+                                                                status: 'rejected',
+                                                            })
+                                                        }
                                                         className="inline-flex items-center gap-2 rounded-2xl bg-red-500 px-4 py-2 text-sm text-white hover:bg-red-600"
                                                     >
                                                         <FiX />
@@ -462,6 +487,97 @@ export default function LeavePage() {
                     )}
                 </section>
             </div>
+
+            {confirmAction && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 px-4 py-6">
+                    <div className="w-full max-w-md rounded-lg border border-slate-200 bg-white p-5 shadow-xl dark:border-slate-800 dark:bg-slate-900">
+                        <div className="flex items-start gap-4">
+                            <div
+                                className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-lg ${
+                                    confirmAction.status === 'approved'
+                                        ? 'bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300'
+                                        : 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300'
+                                }`}
+                            >
+                                {confirmAction.status === 'approved' ? (
+                                    <FiCheck className="h-5 w-5" />
+                                ) : (
+                                    <FiX className="h-5 w-5" />
+                                )}
+                            </div>
+
+                            <div className="min-w-0 flex-1">
+                                <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                                    {getConfirmTitle(confirmAction.status)}
+                                </h2>
+                                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                                    {getConfirmDescription(confirmAction.status)}
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="mt-5 rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm dark:border-slate-800 dark:bg-slate-950">
+                            <div className="flex justify-between gap-3">
+                                <span className="text-slate-500 dark:text-slate-400">
+                                    ผู้ขอ
+                                </span>
+                                <span className="text-right font-medium text-slate-900 dark:text-slate-100">
+                                    {confirmAction.leave.full_name_th}
+                                </span>
+                            </div>
+                            <div className="mt-2 flex justify-between gap-3">
+                                <span className="text-slate-500 dark:text-slate-400">
+                                    ประเภท
+                                </span>
+                                <span className="text-right font-medium text-slate-900 dark:text-slate-100">
+                                    {getLeaveTypeLabel(confirmAction.leave.leave_type)}
+                                </span>
+                            </div>
+                            <div className="mt-2 flex justify-between gap-3">
+                                <span className="text-slate-500 dark:text-slate-400">
+                                    วันที่
+                                </span>
+                                <span className="text-right font-medium text-slate-900 dark:text-slate-100">
+                                    {formatDate(confirmAction.leave.start_date)} - {formatDate(confirmAction.leave.end_date)}
+                                </span>
+                            </div>
+                        </div>
+
+                        <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                            <button
+                                type="button"
+                                onClick={() => setConfirmAction(null)}
+                                disabled={actionSaving}
+                                className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                            >
+                                ยกเลิก
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() =>
+                                    updateLeaveStatus(
+                                        confirmAction.leave.leave_id,
+                                        confirmAction.status
+                                    )
+                                }
+                                disabled={actionSaving}
+                                className={`inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
+                                    confirmAction.status === 'approved'
+                                        ? 'bg-green-600 hover:bg-green-700'
+                                        : 'bg-red-600 hover:bg-red-700'
+                                }`}
+                            >
+                                {actionSaving && (
+                                    <FiRefreshCw className="h-4 w-4 animate-spin" />
+                                )}
+                                {confirmAction.status === 'approved'
+                                    ? 'ยืนยันอนุมัติ'
+                                    : 'ยืนยันปฏิเสธ'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </main>
     )
 }

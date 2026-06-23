@@ -1,13 +1,9 @@
 export const metadata = {
-    title: "Report Project and Task | Anuminow ERP System",
-    dedscription: "ระบบแสดงรายงานของโปรเจ็กและงาน",
-    robots: "index, following"
+    title: 'Reports | Anuminow Solution ERP',
+    description: 'รายงานสรุปภาพรวมโครงการ งาน และประสิทธิภาพการทำงาน',
+    robots: 'index, follow',
 }
 
 export default function ReportLayout({ children }) {
-    return (
-        <div>
-            {children}
-        </div>
-    )
+    return children
 }

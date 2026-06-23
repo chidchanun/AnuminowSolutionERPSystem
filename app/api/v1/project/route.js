@@ -4,6 +4,7 @@ import {
     hasAnyPermission,
     requirePermission,
 } from '@/app/lib/permission'
+import { writeAuditLog } from '@/app/lib/auditLog'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -243,6 +244,20 @@ export async function POST(request) {
                 [values]
             )
         }
+
+        await writeAuditLog({
+            connection,
+            actorId: user.id,
+            action: 'project.create',
+            entityType: 'project',
+            entityId: projectId,
+            summary: `Create project ${project_name}`,
+            metadata: {
+                project_code,
+                status,
+                member_ids: [...memberSet],
+            },
+        })
 
         await connection.commit()
 

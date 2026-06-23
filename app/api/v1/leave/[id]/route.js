@@ -6,6 +6,7 @@ import {
     hasPermissionKey,
     requirePermission,
 } from '@/app/lib/permission'
+import { writeAuditLog } from '@/app/lib/auditLog'
 
 export const dynamic = 'force-dynamic'
 
@@ -76,6 +77,16 @@ export async function PATCH(request, context) {
             )
         }
 
+        if (String(leave.user_id) === String(user.id)) {
+            return NextResponse.json(
+                {
+                    success: false,
+                    message: 'ไม่สามารถอนุมัติหรือปฏิเสธคำขอลาของตัวเองได้',
+                },
+                { status: 403 }
+            )
+        }
+
         if (leave.status !== 'pending') {
             return NextResponse.json(
                 { success: false, message: 'รายการนี้ถูกดำเนินการแล้ว' },
@@ -136,6 +147,23 @@ export async function PATCH(request, context) {
                 )
             }
         }
+
+        await writeAuditLog({
+            connection,
+            actorId: user.id,
+            action: status === 'approved' ? 'leave.approve' : 'leave.reject',
+            entityType: 'leave_request',
+            entityId: leaveId,
+            summary: `${status} leave request ${leaveId}`,
+            metadata: {
+                requester_id: leave.user_id,
+                leave_type: leave.leave_type,
+                start_date: leave.start_date,
+                end_date: leave.end_date,
+                reject_reason: status === 'rejected' ? reject_reason : null,
+            },
+        })
+
         const notificationTargetUserIds =
             await createLeaveResultNotification({
                 connection,
@@ -179,17 +207,13 @@ export async function PATCH(request, context) {
 
 export async function DELETE(request, context) {
     try {
+        const auth = await requirePermission(request, 'leave.view')
+
+        if (auth.response) return auth.response
+
+        const user = auth.user
         const { id } = await context.params
         const leaveId = Number(id)
-
-        const user = await getAuthUser(request)
-
-        if (!user) {
-            return NextResponse.json(
-                { success: false, message: 'Unauthorized' },
-                { status: 401 }
-            )
-        }
 
         const [leaveRows] = await db.execute(
             `
@@ -236,6 +260,18 @@ export async function DELETE(request, context) {
             `,
             [leaveId]
         )
+
+        await writeAuditLog({
+            actorId: user.id,
+            action: 'leave.delete',
+            entityType: 'leave_request',
+            entityId: leaveId,
+            summary: `Delete leave request ${leaveId}`,
+            metadata: {
+                requester_id: leave.user_id,
+                previous_status: leave.status,
+            },
+        })
 
         return NextResponse.json({
             success: true,

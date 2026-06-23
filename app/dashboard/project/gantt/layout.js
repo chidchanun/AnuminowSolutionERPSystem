@@ -1,7 +1,7 @@
 export const metadata = {
-    title: "Gantt Chart Project | Anuminow ERP System",
-    descripton: "ระบบแสดง Gantt Chart Project สำหรับพนักงาน",
-    robots: "index, following"
+    title: 'Project Gantt Chart | Anuminow Solution ERP',
+    description: 'ดูแผนงาน ระยะเวลา และความคืบหน้าของโครงการ',
+    robots: 'index, follow',
 }
 
 export default function GanttChartProjectLayout({ children }) {

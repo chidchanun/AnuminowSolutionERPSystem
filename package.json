@@ -9,7 +9,8 @@
     "lint": "eslint",
     "test": "node --experimental-vm-modules --test scripts/test-*.mjs",
     "seed:permissions": "node scripts/seed-permissions.mjs",
-    "seed:permissions:dry": "node scripts/seed-permissions.mjs --dry-run"
+    "seed:permissions:dry": "node scripts/seed-permissions.mjs --dry-run",
+    "setup:audit-log": "node scripts/setup-audit-log.mjs"
   },
   "dependencies": {
     "@tiptap/extension-color": "^3.26.1",

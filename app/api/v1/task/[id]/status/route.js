@@ -4,6 +4,7 @@ import {
     hasTaskWideAccess,
     requirePermission,
 } from '@/app/lib/permission'
+import { writeAuditLog } from '@/app/lib/auditLog'
 
 export const dynamic = 'force-dynamic'
 
@@ -186,6 +187,20 @@ export async function PATCH(request, context) {
                 userId,
             ]
         )
+
+        await writeAuditLog({
+            connection,
+            actorId: userId,
+            action: 'task.status_change',
+            entityType: 'task',
+            entityId: taskId,
+            summary: `Change task status from ${oldStatus} to ${newStatus}`,
+            metadata: {
+                old_status: oldStatus,
+                new_status: newStatus,
+                project_id: task.project_id,
+            },
+        })
 
         await connection.commit()
 

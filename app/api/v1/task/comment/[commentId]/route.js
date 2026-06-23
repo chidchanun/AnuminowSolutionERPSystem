@@ -4,6 +4,7 @@ import {
     getAuthUserWithPermissions,
     hasTaskWideAccess,
 } from '@/app/lib/permission'
+import { writeAuditLog } from '@/app/lib/auditLog'
 
 
 async function getAuthUser(request) {
@@ -164,6 +165,18 @@ export async function PUT(request, { params }) {
             ]
         )
 
+        await writeAuditLog({
+            connection,
+            actorId: user.id,
+            action: 'task.comment.update',
+            entityType: 'task_comment',
+            entityId: commentId,
+            summary: `Update comment ${commentId}`,
+            metadata: {
+                task_id: oldComment.task_id,
+            },
+        })
+
         await connection.commit()
 
         return NextResponse.json({
@@ -280,6 +293,18 @@ export async function DELETE(request, { params }) {
                 user.id,
             ]
         )
+
+        await writeAuditLog({
+            connection,
+            actorId: user.id,
+            action: 'task.comment.delete',
+            entityType: 'task_comment',
+            entityId: commentId,
+            summary: `Delete comment ${commentId}`,
+            metadata: {
+                task_id: comment.task_id,
+            },
+        })
 
         await connection.commit()
 

@@ -6,6 +6,7 @@ import {
 } from '@/app/lib/permission'
 import { createNotifications } from '@/app/lib/notification'
 import { emitNotificationToUsers } from '@/app/lib/socketEmit'
+import { writeAuditLog } from '@/app/lib/auditLog'
 
 async function getAuthUser(request) {
     return getAuthUserWithPermissions(request)
@@ -428,6 +429,21 @@ export async function POST(request, { params }) {
                 user.id,
             ]
         )
+
+        await writeAuditLog({
+            connection,
+            actorId: user.id,
+            action: parentCommentId ? 'task.reply.create' : 'task.comment.create',
+            entityType: 'task_comment',
+            entityId: result.insertId,
+            summary: parentCommentId
+                ? `Create reply on task ${taskId}`
+                : `Create comment on task ${taskId}`,
+            metadata: {
+                task_id: taskId,
+                parent_comment_id: parentCommentId,
+            },
+        })
 
 
         await connection.commit()

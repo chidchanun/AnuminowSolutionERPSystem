@@ -6,6 +6,7 @@ import {
     FiRefreshCw,
     FiSave,
     FiShield,
+    FiX,
 } from 'react-icons/fi'
 
 function groupPermissionsByModule(permissions) {
@@ -55,6 +56,7 @@ async function requestPermissionMatrix(signal) {
 
 export default function PermissionPage() {
     const [roles, setRoles] = useState([])
+    const [selectedRoleId, setSelectedRoleId] = useState('')
     const [permissions, setPermissions] = useState([])
     const [matrix, setMatrix] = useState({})
     const [canManage, setCanManage] = useState(false)
@@ -67,6 +69,16 @@ export default function PermissionPage() {
     const groupedPermissions = useMemo(
         () => groupPermissionsByModule(permissions),
         [permissions]
+    )
+
+    const effectiveSelectedRoleId =
+        selectedRoleId || String(roles[0]?.permission_role_id || '')
+
+    const selectedRole = useMemo(
+        () => roles.find((role) =>
+            String(role.permission_role_id) === effectiveSelectedRoleId
+        ),
+        [roles, effectiveSelectedRoleId]
     )
 
     const applyPermissionData = (data) => {
@@ -223,13 +235,138 @@ export default function PermissionPage() {
                     </div>
                 )}
 
-                <section className="rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
                     {loading ? (
                         <div className="p-8 text-center text-sm text-slate-500">
                             กำลังโหลด Permission...
                         </div>
                     ) : (
-                        <div className="overflow-x-auto">
+                        <>
+                        <div className="space-y-4 p-4 md:hidden">
+                            <div className="space-y-2">
+                                <label
+                                    htmlFor="mobile-role"
+                                    className="text-xs font-medium text-slate-500 dark:text-slate-400"
+                                >
+                                    Permission Role
+                                </label>
+                                <select
+                                    id="mobile-role"
+                                    value={effectiveSelectedRoleId}
+                                    onChange={(event) =>
+                                        setSelectedRoleId(event.target.value)
+                                    }
+                                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition-colors focus:border-sky-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                                >
+                                    {roles.map((role) => (
+                                        <option
+                                            key={role.permission_role_id}
+                                            value={role.permission_role_id}
+                                        >
+                                            {role.permission_role_name}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            {selectedRole && canManage && (
+                                <button
+                                    type="button"
+                                    onClick={() =>
+                                        saveRolePermission(
+                                            selectedRole.permission_role_id
+                                        )
+                                    }
+                                    disabled={
+                                        savingRoleId ===
+                                        selectedRole.permission_role_id
+                                    }
+                                    className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
+                                >
+                                    {savingRoleId ===
+                                        selectedRole.permission_role_id ? (
+                                        <>
+                                            <FiRefreshCw className="h-4 w-4 animate-spin" />
+                                            Saving
+                                        </>
+                                    ) : (
+                                        <>
+                                            <FiSave className="h-4 w-4" />
+                                            Save {selectedRole.permission_role_name}
+                                        </>
+                                    )}
+                                </button>
+                            )}
+
+                            {Object.entries(groupedPermissions).map(
+                                ([moduleName, modulePermissions]) => (
+                                    <div
+                                        key={moduleName}
+                                        className="rounded-lg border border-slate-200 dark:border-slate-800"
+                                    >
+                                        <div className="border-b border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-800 dark:bg-slate-950">
+                                            <p className="font-semibold text-slate-900 dark:text-slate-100">
+                                                {moduleName}
+                                            </p>
+                                        </div>
+
+                                        <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                                            {modulePermissions.map((permission) => {
+                                                const checked =
+                                                    selectedRole &&
+                                                    hasPermission(
+                                                        selectedRole.permission_role_id,
+                                                        permission.permission_id
+                                                    )
+
+                                                return (
+                                                    <button
+                                                        key={permission.permission_id}
+                                                        type="button"
+                                                        onClick={() =>
+                                                            selectedRole &&
+                                                            togglePermission(
+                                                                selectedRole.permission_role_id,
+                                                                permission.permission_id
+                                                            )
+                                                        }
+                                                        disabled={!canManage}
+                                                        className="flex w-full items-start justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-slate-50 disabled:cursor-not-allowed dark:hover:bg-slate-950"
+                                                    >
+                                                        <span className="min-w-0">
+                                                            <span className="block text-sm font-medium text-slate-900 dark:text-slate-100">
+                                                                {permission.permission_name}
+                                                            </span>
+                                                            <span className="mt-1 block break-all text-xs text-slate-500 dark:text-slate-400">
+                                                                {permission.permission_key}
+                                                            </span>
+                                                        </span>
+
+                                                        <span
+                                                            className={`
+                                                                mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border transition
+                                                                ${checked
+                                                                    ? 'border-sky-500 bg-sky-500 text-white'
+                                                                    : 'border-slate-300 bg-white text-slate-300 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-600'
+                                                                }
+                                                            `}
+                                                        >
+                                                            {checked ? (
+                                                                <FiCheck />
+                                                            ) : (
+                                                                <FiX />
+                                                            )}
+                                                        </span>
+                                                    </button>
+                                                )
+                                            })}
+                                        </div>
+                                    </div>
+                                )
+                            )}
+                        </div>
+
+                        <div className="hidden overflow-x-auto md:block">
                             <table className="min-w-[950px] w-full border-collapse text-sm">
                                 <thead>
                                     <tr className="border-b border-slate-200 bg-slate-100 dark:border-slate-800 dark:bg-slate-800">
@@ -357,6 +494,7 @@ export default function PermissionPage() {
                                 </tbody>
                             </table>
                         </div>
+                        </>
                     )}
                 </section>
             </div>

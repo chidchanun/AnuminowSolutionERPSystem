@@ -7,6 +7,7 @@ import {
     hasPermissionKey,
     requirePermission,
 } from '@/app/lib/permission'
+import { writeAuditLog } from '@/app/lib/auditLog'
 
 export const dynamic = 'force-dynamic'
 
@@ -89,6 +90,8 @@ export async function GET(request) {
             leaves: rows,
             permission: {
                 can_approve: canApprove,
+                can_manage: canApprove,
+                current_user_id: user.id,
             },
         })
     } catch (error) {
@@ -177,6 +180,20 @@ export async function POST(request) {
         )
 
         const leaveId = result.insertId
+
+        await writeAuditLog({
+            actorId: user.id,
+            action: 'leave.create',
+            entityType: 'leave_request',
+            entityId: leaveId,
+            summary: `Create leave request ${leaveId}`,
+            metadata: {
+                requester_id: targetUserId,
+                leave_type,
+                start_date,
+                end_date,
+            },
+        })
 
         const notificationTargetUserIds =
             await createLeaveSubmittedNotifications({

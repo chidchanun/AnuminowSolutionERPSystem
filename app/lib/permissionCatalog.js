@@ -144,6 +144,18 @@ export const permissionCatalog = [
         defaultRoles: ['Admin', 'Manager', 'Team Lead'],
     },
     {
+        key: 'audit.view',
+        name: 'View Audit Log',
+        module: 'Audit',
+        defaultRoles: ['Admin'],
+    },
+    {
+        key: 'audit.export',
+        name: 'Export Audit Log',
+        module: 'Audit',
+        defaultRoles: ['Admin'],
+    },
+    {
         key: 'permission.view',
         name: 'View Permission Matrix',
         module: 'Permission',

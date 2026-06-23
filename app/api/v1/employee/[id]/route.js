@@ -4,6 +4,7 @@ import {
     hasPermissionKey,
     requirePermission,
 } from '@/app/lib/permission'
+import { writeAuditLog } from '@/app/lib/auditLog'
 
 export const dynamic = 'force-dynamic'
 
@@ -250,6 +251,20 @@ export async function PUT(request, context) {
             )
         }
 
+        await writeAuditLog({
+            actorId: user.id,
+            action: 'employee.update',
+            entityType: 'employee',
+            entityId: employeeId,
+            summary: `Update employee ${employeeId}`,
+            metadata: {
+                email,
+                department_id,
+                role_id,
+                status,
+            },
+        })
+
         return NextResponse.json({
             success: true,
             message: 'แก้ไขข้อมูลพนักงานสำเร็จ',
@@ -309,6 +324,17 @@ export async function DELETE(request, context) {
                 { status: 404 }
             )
         }
+
+        await writeAuditLog({
+            actorId: user.id,
+            action: 'employee.delete',
+            entityType: 'employee',
+            entityId: employeeId,
+            summary: `Delete employee ${employeeId}`,
+            metadata: {
+                status: 'inactive',
+            },
+        })
 
         return NextResponse.json({
             success: true,

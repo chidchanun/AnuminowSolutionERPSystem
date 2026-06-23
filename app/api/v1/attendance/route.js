@@ -4,6 +4,7 @@ import {
     hasPermission,
     requirePermission,
 } from '@/app/lib/permission'
+import { writeAuditLog } from '@/app/lib/auditLog'
 
 export const dynamic = 'force-dynamic'
 
@@ -287,6 +288,21 @@ export async function POST(request) {
                 user.id,
             ]
         )
+
+        await writeAuditLog({
+            actorId: user.id,
+            action: 'attendance.upsert',
+            entityType: 'attendance',
+            entityId: `${user_id}:${work_date}`,
+            summary: `Upsert attendance for ${user_id} on ${work_date}`,
+            metadata: {
+                user_id,
+                work_date,
+                check_in,
+                check_out,
+                status,
+            },
+        })
 
         return NextResponse.json({
             success: true,

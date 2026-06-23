@@ -153,7 +153,7 @@ export default function TextEditor({
                 updateToolbarState
             )
         }
-    }, [])
+    }, [value])
 
     return (
         <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm overflow-hidden">
@@ -263,7 +263,7 @@ export default function TextEditor({
                 contentEditable
                 suppressContentEditableWarning
                 className="
-                    min-h-[300px]
+                    min-h-75
                     p-6
                     outline-none
                     leading-7

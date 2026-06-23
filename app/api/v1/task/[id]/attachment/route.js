@@ -4,6 +4,7 @@ import {
     getAuthUserWithPermissions,
     hasTaskWideAccess,
 } from '@/app/lib/permission'
+import { writeAuditLog } from '@/app/lib/auditLog'
 import path from 'path'
 import { mkdir, writeFile } from 'fs/promises'
 
@@ -360,6 +361,21 @@ export async function POST(request, { params }) {
                 user.id,
             ]
         )
+
+        await writeAuditLog({
+            connection,
+            actorId: user.id,
+            action: 'task.attachment.create',
+            entityType: 'task_attachment',
+            entityId: result.insertId,
+            summary: `Attach file ${originalName} to task ${taskId}`,
+            metadata: {
+                task_id: taskId,
+                original_name: originalName,
+                file_size: file.size,
+                mime_type: file.type,
+            },
+        })
 
         await connection.commit()
 

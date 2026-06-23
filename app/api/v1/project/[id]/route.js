@@ -4,6 +4,7 @@ import {
     hasProjectWideAccess,
     requirePermission,
 } from '@/app/lib/permission'
+import { writeAuditLog } from '@/app/lib/auditLog'
 
 export async function GET(
     request,
@@ -119,6 +120,8 @@ export async function PUT(
 
         if (auth.response) return auth.response
 
+        const user = auth.user
+
         const { id } = await params
 
         const body = await request.json()
@@ -208,6 +211,22 @@ export async function PUT(
                     [values]
                 )
             }
+
+            await writeAuditLog({
+                connection,
+                actorId: user.id,
+                action: 'project.update',
+                entityType: 'project',
+                entityId: id,
+                summary: `Update project ${project_name}`,
+                metadata: {
+                    project_code,
+                    status,
+                    member_ids: Array.isArray(member_ids)
+                        ? member_ids
+                        : [],
+                },
+            })
 
             await connection.commit()
 
@@ -331,6 +350,18 @@ export async function DELETE(request, context) {
                 projectId,
             ]
         )
+
+        await writeAuditLog({
+            connection,
+            actorId: userId,
+            action: 'project.delete',
+            entityType: 'project',
+            entityId: projectId,
+            summary: `Delete project ${project.project_name}`,
+            metadata: {
+                project_name: project.project_name,
+            },
+        })
 
         await connection.commit()
 

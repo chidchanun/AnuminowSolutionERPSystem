@@ -153,7 +153,7 @@ export default function Sidebar({
                 flex h-screen w-72 flex-col
                 overflow-hidden
                 transform
-                border-r border-slate-200 bg-white p-6
+                border-r border-slate-200 bg-white py-6 px-4
                 transition-transform duration-300
                 dark:border-slate-800 dark:bg-slate-900
                 lg:sticky lg:top-0 lg:translate-x-0

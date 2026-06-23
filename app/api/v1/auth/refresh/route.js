@@ -1,6 +1,41 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/app/lib/db'
 import jwt from 'jsonwebtoken'
+import { writeAuditLog } from '@/app/lib/auditLog'
+
+function getRequestMetadata(request) {
+  return {
+    ip:
+      request.headers.get('x-forwarded-for') ||
+      request.headers.get('x-real-ip') ||
+      request.ip ||
+      'Unknown',
+    user_agent: request.headers.get('user-agent') || 'Unknown',
+  }
+}
+
+async function writeRefreshAudit({
+  request,
+  actorId = null,
+  action = 'auth.refresh_failed',
+  reason,
+  entityId = null,
+}) {
+  await writeAuditLog({
+    actorId,
+    action,
+    entityType: 'auth',
+    entityId,
+    summary:
+      action === 'auth.refresh_success'
+        ? `${actorId} refreshed access token`
+        : `Refresh token failed: ${reason}`,
+    metadata: {
+      ...getRequestMetadata(request),
+      reason,
+    },
+  })
+}
 
 export async function POST(request) {
   try {
@@ -8,6 +43,11 @@ export async function POST(request) {
       request.cookies.get('refreshToken')?.value
 
     if (!refreshToken) {
+      await writeRefreshAudit({
+        request,
+        reason: 'missing_refresh_token',
+      })
+
       return NextResponse.json(
         { message: 'Refresh token missing' },
         { status: 401 }
@@ -29,6 +69,11 @@ export async function POST(request) {
     const session = sessionRows[0]
 
     if (!session) {
+      await writeRefreshAudit({
+        request,
+        reason: 'invalid_refresh_token',
+      })
+
       return NextResponse.json(
         { message: 'Invalid refresh token' },
         { status: 401 }
@@ -37,6 +82,13 @@ export async function POST(request) {
 
     // ตรวจสอบว่าโดน revoke หรือไม่
     if (session.revoked_at) {
+      await writeRefreshAudit({
+        request,
+        actorId: session.user_id,
+        reason: 'token_revoked',
+        entityId: session.user_id,
+      })
+
       return NextResponse.json(
         { message: 'Token revoked' },
         { status: 401 }
@@ -48,6 +100,13 @@ export async function POST(request) {
       session.expired_at &&
       new Date(session.expired_at) < new Date()
     ) {
+      await writeRefreshAudit({
+        request,
+        actorId: session.user_id,
+        reason: 'token_expired',
+        entityId: session.user_id,
+      })
+
       return NextResponse.json(
         { message: 'Token expired' },
         { status: 401 }
@@ -78,6 +137,13 @@ export async function POST(request) {
     const user = userRows[0]
 
     if (!user) {
+      await writeRefreshAudit({
+        request,
+        actorId: session.user_id,
+        reason: 'user_not_found',
+        entityId: session.user_id,
+      })
+
       return NextResponse.json(
         { message: 'User not found' },
         { status: 404 }
@@ -116,6 +182,14 @@ export async function POST(request) {
       sameSite: 'strict',
       maxAge: 60 * 60,
       path: '/'
+    })
+
+    await writeRefreshAudit({
+      request,
+      actorId: user.id,
+      action: 'auth.refresh_success',
+      reason: 'success',
+      entityId: user.id,
     })
 
     return response

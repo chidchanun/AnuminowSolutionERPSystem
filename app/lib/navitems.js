@@ -2,13 +2,13 @@ import {
     FiHome,
     FiUsers,
     FiBarChart2,
-    FiSettings,
     FiFolder,
     FiCheckSquare,
     FiBell,
     FiActivity,
     FiCalendar,
     FiClock,
+    FiDatabase,
     FiShield,
 } from 'react-icons/fi'
 
@@ -175,32 +175,10 @@ export const navGroups = [
                 permissionKey: 'permission.view',
             },
             {
-                label: 'ตั้งค่า',
-                icon: FiSettings,
-                href: '/dashboard/setting',
-                permissionKey: 'permission.manage',
-                subMenu: [
-                    {
-                        label: 'ตั้งค่าระบบ',
-                        href: '/dashboard/setting',
-                        permissionKey: 'permission.manage',
-                    },
-                    {
-                        label: 'แผนก',
-                        href: '/dashboard/setting/department',
-                        permissionKey: 'permission.manage',
-                    },
-                    {
-                        label: 'ตำแหน่ง',
-                        href: '/dashboard/setting/role',
-                        permissionKey: 'permission.manage',
-                    },
-                    {
-                        label: 'สิทธิ์ผู้ใช้',
-                        href: '/dashboard/setting/permission',
-                        permissionKey: 'permission.manage',
-                    },
-                ],
+                label: 'Master Data',
+                icon: FiDatabase,
+                href: '/dashboard/master-data',
+                permissionKey: 'master_data.view',
             },
         ],
     },

@@ -1,7 +1,7 @@
 import { db } from "@/app/lib/db"
-import { useUser } from "@/app/context/UserContext"
 import { cookies } from 'next/headers'
 import { safeVerifyToken } from '@/app/lib/verifiedToken'
+import { getUserPermissionKeys } from '@/app/lib/permission'
 import Link from "next/link"
 import Image from "next/image"
 
@@ -83,6 +83,10 @@ export default async function DetailProjectPage({ params }) {
     const user = token
         ? safeVerifyToken(token)
         : null
+    const permissions = user?.id
+        ? await getUserPermissionKeys(user.id)
+        : []
+    const canEditProject = permissions.includes('project.update')
 
     const STATUS_COLORS = {
         active: 'bg-green-100 text-green-700',
@@ -124,7 +128,7 @@ export default async function DetailProjectPage({ params }) {
                     >
                         กลับ
                     </Link>
-                    {['Admin', 'Manager'].includes(user?.permission_role) && (
+                    {canEditProject && (
                         <Link
                             href={`/dashboard/project/${project.project_id}/edit`}
                             className="px-4 py-2 rounded-xl bg-sky-500 text-white hover:bg-sky-600"

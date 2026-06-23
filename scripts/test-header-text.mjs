@@ -28,6 +28,7 @@ test('getHeaderTitle resolves dashboard and admin routes', () => {
     assert.equal(getHeaderTitle('/dashboard/activity'), 'Activity Log')
     assert.equal(getHeaderTitle('/dashboard/audit-log'), 'Audit Log')
     assert.equal(getHeaderTitle('/dashboard/permission'), 'Permission Matrix')
+    assert.equal(getHeaderTitle('/dashboard/master-data'), 'Master Data')
     assert.equal(getHeaderTitle('/dashboard/notification'), 'Notifications')
 })
 

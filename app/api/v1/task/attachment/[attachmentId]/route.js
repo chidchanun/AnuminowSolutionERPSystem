@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { db } from '@/app/lib/db'
 import {
     getAuthUserWithPermissions,
+    hasPermissionKey,
     hasTaskWideAccess,
 } from '@/app/lib/permission'
 import path from 'path'
@@ -40,7 +41,7 @@ function canDeleteAttachment(attachment, user) {
         return false
     }
 
-    if (hasTaskWideAccess(user)) {
+    if (hasPermissionKey(user, 'task.delete')) {
         return true
     }
 

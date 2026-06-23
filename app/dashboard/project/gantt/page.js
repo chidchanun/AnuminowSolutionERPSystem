@@ -566,7 +566,7 @@ export default function ProjectGanttPage() {
             ignore = true
             controller.abort()
         }
-    }, [queryString])
+    }, [queryString, viewMode])
 
     const taskMapByProject = useMemo(() => {
         const map = {}
@@ -998,7 +998,6 @@ export default function ProjectGanttPage() {
                             }}
                         >
 
-                            ถ้าใช้ Ta
                             <div className="sticky top-0 z-50 bg-white dark:bg-slate-900">
 
                                 <div

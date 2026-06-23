@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import {
     FiActivity,
@@ -9,6 +9,7 @@ import {
     FiBriefcase,
     FiCheckCircle,
     FiClock,
+    FiRefreshCw,
     FiUsers,
 } from 'react-icons/fi'
 
@@ -45,6 +46,48 @@ function StatCard({
         <Link href={href}>
             {content}
         </Link>
+    )
+}
+
+function ErrorPanel({ message, loading, onRetry }) {
+    return (
+        <section className="rounded-2xl border border-rose-200 bg-rose-50 p-5 text-rose-800 shadow-sm dark:border-rose-900 dark:bg-rose-950 dark:text-rose-200">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex gap-3">
+                    <div className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-rose-100 text-rose-700 dark:bg-rose-900 dark:text-rose-200">
+                        <FiAlertTriangle className="h-5 w-5" />
+                    </div>
+
+                    <div>
+                        <h2 className="text-sm font-semibold">
+                            โหลดข้อมูล Dashboard ไม่สำเร็จ
+                        </h2>
+
+                        <p className="mt-1 text-sm text-rose-700 dark:text-rose-300">
+                            {message || 'เกิดข้อผิดพลาดระหว่างโหลดข้อมูล'}
+                        </p>
+                    </div>
+                </div>
+
+                <button
+                    type="button"
+                    onClick={onRetry}
+                    disabled={loading}
+                    className="inline-flex items-center justify-center gap-2 rounded-xl border border-rose-200 bg-white px-4 py-2 text-sm font-medium text-rose-700 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-rose-800 dark:bg-rose-950 dark:text-rose-200 dark:hover:bg-rose-900"
+                >
+                    <FiRefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+                    ลองใหม่
+                </button>
+            </div>
+        </section>
+    )
+}
+
+function EmptyState({ children }) {
+    return (
+        <div className="flex min-h-28 items-center justify-center rounded-2xl bg-slate-50 p-4 text-center text-sm text-slate-500 dark:bg-slate-950 dark:text-slate-400">
+            {children}
+        </div>
     )
 }
 
@@ -97,6 +140,33 @@ function formatDateTime(date) {
     })
 }
 
+async function requestDashboard(signal) {
+    const res = await fetch('/api/v1/dashboard', {
+        cache: 'no-store',
+        signal,
+    })
+    const data = await res.json()
+
+    if (!res.ok) {
+        throw new Error(
+            data.message ||
+                'โหลดข้อมูล Dashboard ไม่สำเร็จ'
+        )
+    }
+
+    return data
+}
+
+function normalizeDashboard(data) {
+    return {
+        stats: data.stats || {},
+        task_status: data.task_status || [],
+        weekly_activity: data.weekly_activity || [],
+        due_soon_tasks: data.due_soon_tasks || [],
+        latest_activities: data.latest_activities || [],
+    }
+}
+
 export default function DashboardPage() {
     const [dashboard, setDashboard] = useState({
         stats: {},
@@ -109,44 +179,41 @@ export default function DashboardPage() {
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState('')
 
+    const loadDashboard = useCallback(async (signal) => {
+        try {
+            const data = await requestDashboard(signal)
+
+            setDashboard(normalizeDashboard(data))
+            setError('')
+        } catch (error) {
+            if (error.name === 'AbortError') {
+                return
+            }
+
+            console.error(error)
+            setError(error.message)
+        } finally {
+            if (!signal?.aborted) {
+                setLoading(false)
+            }
+        }
+    }, [])
+
+    const retryDashboard = useCallback(() => {
+        setLoading(true)
+        loadDashboard()
+    }, [loadDashboard])
+
     useEffect(() => {
-        let ignore = false
         const controller = new AbortController()
 
-        fetch('/api/v1/dashboard', {
-            cache: 'no-store',
-            signal: controller.signal,
-        })
-            .then(async (res) => {
-                const data = await res.json()
-
-                if (!res.ok) {
-                    throw new Error(
-                        data.message ||
-                        'โหลดข้อมูล Dashboard ไม่สำเร็จ'
-                    )
-                }
-
-                return data
-            })
+        requestDashboard(controller.signal)
             .then((data) => {
-                if (ignore) return
-
-                setDashboard({
-                    stats: data.stats || {},
-                    task_status: data.task_status || [],
-                    weekly_activity: data.weekly_activity || [],
-                    due_soon_tasks: data.due_soon_tasks || [],
-                    latest_activities: data.latest_activities || [],
-                })
-
+                setDashboard(normalizeDashboard(data))
                 setError('')
             })
             .catch((error) => {
-                if (
-                    error.name === 'AbortError' ||
-                    ignore
-                ) {
+                if (error.name === 'AbortError') {
                     return
                 }
 
@@ -154,13 +221,12 @@ export default function DashboardPage() {
                 setError(error.message)
             })
             .finally(() => {
-                if (!ignore) {
+                if (!controller.signal.aborted) {
                     setLoading(false)
                 }
             })
 
         return () => {
-            ignore = true
             controller.abort()
         }
     }, [])
@@ -215,9 +281,11 @@ export default function DashboardPage() {
                 </div>
 
                 {error && (
-                    <div className="rounded-3xl border border-red-200 bg-red-50 p-5 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300">
-                        {error}
-                    </div>
+                    <ErrorPanel
+                        message={error}
+                        loading={loading}
+                        onRetry={retryDashboard}
+                    />
                 )}
 
                 <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
@@ -304,9 +372,9 @@ export default function DashboardPage() {
 
                         <div className="mt-6 flex h-56 items-end gap-3 rounded-3xl bg-slate-50 p-5 dark:bg-slate-950">
                             {dashboard.weekly_activity.length === 0 ? (
-                                <div className="flex h-full w-full items-center justify-center text-sm text-slate-500">
+                                <EmptyState>
                                     ยังไม่มีข้อมูลกิจกรรม
-                                </div>
+                                </EmptyState>
                             ) : (
                                 dashboard.weekly_activity.map((item) => {
                                     const value =
@@ -359,9 +427,9 @@ export default function DashboardPage() {
 
                         <div className="mt-5 space-y-4">
                             {dashboard.task_status.length === 0 ? (
-                                <div className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-500 dark:bg-slate-950">
+                                <EmptyState>
                                     ยังไม่มีข้อมูลงาน
-                                </div>
+                                </EmptyState>
                             ) : (
                                 dashboard.task_status.map((item) => {
                                     const count =
@@ -425,9 +493,9 @@ export default function DashboardPage() {
 
                         <div className="mt-5 space-y-3">
                             {dashboard.due_soon_tasks.length === 0 ? (
-                                <div className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-500 dark:bg-slate-950">
+                                <EmptyState>
                                     ไม่มีงานใกล้ครบกำหนด
-                                </div>
+                                </EmptyState>
                             ) : (
                                 dashboard.due_soon_tasks.map((task) => (
                                     <Link
@@ -481,9 +549,9 @@ export default function DashboardPage() {
 
                         <div className="mt-5 space-y-3">
                             {dashboard.latest_activities.length === 0 ? (
-                                <div className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-500 dark:bg-slate-950">
+                                <EmptyState>
                                     ยังไม่มีกิจกรรมล่าสุด
-                                </div>
+                                </EmptyState>
                             ) : (
                                 dashboard.latest_activities.map((item) => (
                                     <Link

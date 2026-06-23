@@ -125,24 +125,9 @@ const headerRules = [
         welcome: 'จัดการสิทธิ์การเข้าถึงของแต่ละ permission role',
     },
     {
-        pattern: /^\/dashboard\/setting\/department\/?$/,
-        title: 'Department Setting',
-        welcome: 'จัดการข้อมูลแผนกในองค์กร',
-    },
-    {
-        pattern: /^\/dashboard\/setting\/role\/?$/,
-        title: 'Role Setting',
-        welcome: 'จัดการตำแหน่งงานและบทบาทภายในองค์กร',
-    },
-    {
-        pattern: /^\/dashboard\/setting\/permission\/?$/,
-        title: 'Permission Setting',
-        welcome: 'ตั้งค่าสิทธิ์และบทบาทการใช้งานระบบ',
-    },
-    {
-        pattern: /^\/dashboard\/setting(?:\/.*)?$/,
-        title: 'System Setting',
-        welcome: 'ตั้งค่าข้อมูลพื้นฐานของระบบ ERP',
+        pattern: /^\/dashboard\/master-data\/?$/,
+        title: 'Master Data',
+        welcome: 'จัดการข้อมูลแผนกและตำแหน่งที่ใช้ร่วมกันในระบบ',
     },
 ]
 

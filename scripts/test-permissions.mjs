@@ -163,6 +163,19 @@ test('hasAnyPermissionKey allows empty requirements and any matching key', () =>
 
 test('wide access helpers are permission based', () => {
     assert.equal(
+        permission.isAdmin({
+            permissions: ['permission.manage'],
+        }),
+        true
+    )
+    assert.equal(
+        permission.isAdmin({
+            permission_role_name: 'Admin',
+            permissions: [],
+        }),
+        false
+    )
+    assert.equal(
         permission.hasProjectWideAccess({
             permissions: ['project.update'],
         }),

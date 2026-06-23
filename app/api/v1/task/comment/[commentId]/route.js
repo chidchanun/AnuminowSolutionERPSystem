@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { db } from '@/app/lib/db'
 import {
     getAuthUserWithPermissions,
+    hasPermissionKey,
     hasTaskWideAccess,
 } from '@/app/lib/permission'
 import { writeAuditLog } from '@/app/lib/auditLog'
@@ -30,12 +31,24 @@ async function getComment(commentId) {
     return rows[0] || null
 }
 
-function canModifyComment(comment, user) {
+function canUpdateComment(comment, user) {
     if (!comment || !user) {
         return false
     }
 
-    if (hasTaskWideAccess(user)) {
+    if (hasPermissionKey(user, 'task.update')) {
+        return true
+    }
+
+    return String(comment.user_id) === String(user.id)
+}
+
+function canDeleteComment(comment, user) {
+    if (!comment || !user) {
+        return false
+    }
+
+    if (hasPermissionKey(user, 'task.delete')) {
         return true
     }
 
@@ -88,7 +101,7 @@ export async function PUT(request, { params }) {
             )
         }
 
-        if (!canModifyComment(oldComment, user)) {
+        if (!canUpdateComment(oldComment, user)) {
             return NextResponse.json(
                 {
                     success: false,
@@ -249,7 +262,7 @@ export async function DELETE(request, { params }) {
             )
         }
 
-        if (!canModifyComment(comment, user)) {
+        if (!canDeleteComment(comment, user)) {
             return NextResponse.json(
                 {
                     success: false,

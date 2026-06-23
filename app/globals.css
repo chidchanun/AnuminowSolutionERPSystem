@@ -46,7 +46,8 @@ body {
 
 /* Chrome / Edge / Safari */
 .sidebar-scroll::-webkit-scrollbar {
-    width: 6px;
+    width: 4px;
+    height: 4px;
 }
 
 .sidebar-scroll::-webkit-scrollbar-track {
@@ -64,6 +65,16 @@ body {
 
 /* เอา arrow บน/ล่างของ scrollbar ออก */
 .sidebar-scroll::-webkit-scrollbar-button {
+    -webkit-appearance: none;
+    display: none;
+    width: 0;
+    height: 0;
+}
+
+.sidebar-scroll::-webkit-scrollbar-button:single-button,
+.sidebar-scroll::-webkit-scrollbar-button:vertical:start:decrement,
+.sidebar-scroll::-webkit-scrollbar-button:vertical:end:increment {
+    -webkit-appearance: none;
     display: none;
     width: 0;
     height: 0;

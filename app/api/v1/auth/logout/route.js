@@ -1,8 +1,21 @@
 import { db } from '@/app/lib/db'
 import { NextResponse } from 'next/server'
+import { writeAuditLog } from '@/app/lib/auditLog'
+
+function getRequestMetadata(request) {
+    return {
+        ip:
+            request.headers.get('x-forwarded-for') ||
+            request.headers.get('x-real-ip') ||
+            request.ip ||
+            'Unknown',
+        user_agent: request.headers.get('user-agent') || 'Unknown',
+    }
+}
 
 export async function POST(request) {
     try {
+        const requestMetadata = getRequestMetadata(request)
         // ดึง refresh token จาก cookies
         const refreshToken = request.cookies.get('refreshToken')?.value
 
@@ -23,6 +36,15 @@ export async function POST(request) {
                 "UPDATE user_session SET revoked_at = NOW() WHERE token = ? AND token_type = 'refresh'",
                 [refreshToken]
             )
+
+            await writeAuditLog({
+                actorId: sessionData.user_id,
+                action: 'auth.logout',
+                entityType: 'auth',
+                entityId: sessionData.user_id,
+                summary: `${sessionData.user_id} logged out`,
+                metadata: requestMetadata,
+            })
         }
 
         // สร้าง response

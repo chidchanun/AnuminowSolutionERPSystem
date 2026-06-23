@@ -64,8 +64,8 @@ const pagePermissionRules = [
         permissionKey: 'permission.view',
     },
     {
-        pattern: /^\/dashboard\/setting(?:\/.*)?$/,
-        permissionKey: 'permission.manage',
+        pattern: /^\/dashboard\/master-data\/?$/,
+        permissionKey: 'master_data.view',
     },
     {
         pattern: /^\/dashboard\/?$/,

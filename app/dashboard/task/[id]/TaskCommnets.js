@@ -94,7 +94,7 @@ export default function TaskComments({
 
     const [comments, setComments] = useState([])
     const [currentUserId, setCurrentUserId] = useState('')
-    const [currentUserRole, setCurrentUserRole] = useState('')
+    const [currentUserPermissions, setCurrentUserPermissions] = useState([])
 
     const [commentText, setCommentText] = useState('')
     const [replyingId, setReplyingId] = useState(null)
@@ -134,7 +134,7 @@ export default function TaskComments({
 
                 setComments(data.comments || [])
                 setCurrentUserId(data.current_user_id || '')
-                setCurrentUserRole(data.current_user_role || '')
+                setCurrentUserPermissions(data.current_user_permissions || [])
                 setError('')
             })
             .catch((error) => {
@@ -177,7 +177,7 @@ export default function TaskComments({
 
             setComments(data.comments || [])
             setCurrentUserId(data.current_user_id || '')
-            setCurrentUserRole(data.current_user_role || '')
+            setCurrentUserPermissions(data.current_user_permissions || [])
             setError('')
         } catch (error) {
             console.error(error)
@@ -191,8 +191,8 @@ export default function TaskComments({
         if (!comment) return false
 
         if (
-            currentUserRole === 'Admin' ||
-            currentUserRole === 'Manager'
+            currentUserPermissions.includes('task.update') ||
+            currentUserPermissions.includes('task.delete')
         ) {
             return true
         }

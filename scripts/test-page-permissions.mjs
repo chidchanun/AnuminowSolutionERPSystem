@@ -51,6 +51,10 @@ test('getPagePermission resolves static dashboard routes', () => {
         getPagePermission('/dashboard/permission'),
         'permission.view'
     )
+    assert.equal(
+        getPagePermission('/dashboard/master-data'),
+        'master_data.view'
+    )
 })
 
 test('getPagePermission resolves project routes in priority order', () => {
@@ -82,7 +86,7 @@ test('getPagePermission resolves task routes in priority order', () => {
     assert.equal(getPagePermission('/dashboard/task/board'), 'task.view')
 })
 
-test('getPagePermission resolves employee and setting routes', () => {
+test('getPagePermission resolves employee routes', () => {
     assert.equal(
         getPagePermission('/dashboard/employee/new'),
         'employee.create'
@@ -94,10 +98,6 @@ test('getPagePermission resolves employee and setting routes', () => {
     assert.equal(
         getPagePermission('/dashboard/employee/U001'),
         'employee.view'
-    )
-    assert.equal(
-        getPagePermission('/dashboard/setting/permission'),
-        'permission.manage'
     )
 })
 

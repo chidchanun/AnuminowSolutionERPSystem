@@ -123,7 +123,7 @@ export default function TaskAttachments({
 
     const [attachments, setAttachments] = useState([])
     const [currentUserId, setCurrentUserId] = useState('')
-    const [currentUserRole, setCurrentUserRole] = useState('')
+    const [currentUserPermissions, setCurrentUserPermissions] = useState([])
 
     const [selectedFile, setSelectedFile] = useState(null)
     const [loading, setLoading] = useState(true)
@@ -145,7 +145,7 @@ export default function TaskAttachments({
 
                 setAttachments(data.attachments || [])
                 setCurrentUserId(data.current_user_id || '')
-                setCurrentUserRole(data.current_user_role || '')
+                setCurrentUserPermissions(data.current_user_permissions || [])
                 setError('')
             })
             .catch((error) => {
@@ -188,7 +188,7 @@ export default function TaskAttachments({
 
             setAttachments(data.attachments || [])
             setCurrentUserId(data.current_user_id || '')
-            setCurrentUserRole(data.current_user_role || '')
+            setCurrentUserPermissions(data.current_user_permissions || [])
             setError('')
         } catch (error) {
             console.error(error)
@@ -201,10 +201,7 @@ export default function TaskAttachments({
     const canDelete = (attachment) => {
         if (!attachment) return false
 
-        if (
-            currentUserRole === 'Admin' ||
-            currentUserRole === 'Manager'
-        ) {
+        if (currentUserPermissions.includes('task.delete')) {
             return true
         }
 

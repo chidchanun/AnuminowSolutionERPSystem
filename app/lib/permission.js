@@ -253,7 +253,7 @@ export async function requireAnyPermission(
 }
 
 export function isAdmin(user) {
-  return user?.permission_role_name === 'Admin'
+  return hasPermissionKey(user, 'permission.manage')
 }
 
 export function hasPermissionKey(user, permissionKey) {

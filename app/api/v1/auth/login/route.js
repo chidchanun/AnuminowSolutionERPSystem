@@ -2,12 +2,24 @@ import { db } from '@/app/lib/db'
 import { NextResponse } from 'next/server'
 import jwt from 'jsonwebtoken'
 import bcrypt from 'bcrypt'
+import { writeAuditLog } from '@/app/lib/auditLog'
 
+function getRequestMetadata(request) {
+    return {
+        ip:
+            request.headers.get('x-forwarded-for') ||
+            request.headers.get('x-real-ip') ||
+            request.ip ||
+            'Unknown',
+        user_agent: request.headers.get('user-agent') || 'Unknown',
+    }
+}
 
 export async function POST(request) {
     try {
         const body = await request.json()
         const { id, password } = body
+        const requestMetadata = getRequestMetadata(request)
 
         if (!id || !password) {
             return NextResponse.json({ status: 401, message: "กรุณากรอกชื่อผู้ใช้และรหัสผ่านให้ครบถ้วน" })
@@ -29,6 +41,19 @@ export async function POST(request) {
         const userData = userRows[0]
 
         if (!userData) {
+            await writeAuditLog({
+                actorId: null,
+                action: 'auth.login_failed',
+                entityType: 'auth',
+                entityId: id,
+                summary: `Login failed for ${id}`,
+                metadata: {
+                    ...requestMetadata,
+                    reason: 'user_not_found',
+                    attempted_user_id: id,
+                },
+            })
+
             return NextResponse.json({ message: 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง' }, { status: 401 })
         }
 
@@ -36,6 +61,19 @@ export async function POST(request) {
         const isPasswordValid = await bcrypt.compare(password, userData.password_hash)
 
         if (!isPasswordValid) {
+            await writeAuditLog({
+                actorId: null,
+                action: 'auth.login_failed',
+                entityType: 'auth',
+                entityId: userData.id,
+                summary: `Login failed for ${userData.id}`,
+                metadata: {
+                    ...requestMetadata,
+                    reason: 'invalid_password',
+                    attempted_user_id: userData.id,
+                },
+            })
+
             return NextResponse.json({ message: 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง' }, { status: 401 })
         }
 
@@ -64,14 +102,32 @@ export async function POST(request) {
             { expiresIn: '7d' }
         )
 
-        const ip = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || request.ip || 'Unknown'
-        const userAgent = request.headers.get('user-agent') || 'Unknown'
-
         // บันทึกหรืออัปเดต refresh token ลงฐานข้อมูล
         await db.query(
             "INSERT INTO user_session (user_id, token, token_type, ip_address, user_agent, expired_at) VALUES (?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE token = VALUES(token), ip_address = VALUES(ip_address), user_agent = VALUES(user_agent), expired_at = VALUES(expired_at), revoked_at = NULL",
-            [userData.id, refreshToken, 'refresh', ip, userAgent, new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)]
+            [
+                userData.id,
+                refreshToken,
+                'refresh',
+                requestMetadata.ip,
+                requestMetadata.user_agent,
+                new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+            ]
         )
+
+        await writeAuditLog({
+            actorId: userData.id,
+            action: 'auth.login_success',
+            entityType: 'auth',
+            entityId: userData.id,
+            summary: `${userData.id} logged in`,
+            metadata: {
+                ...requestMetadata,
+                department_name: userData.department_name,
+                role_name: userData.role_name,
+                permission_role: userData.permission_role_name,
+            },
+        })
 
         // สร้าง response และตั้ง cookies
         const response = NextResponse.json({

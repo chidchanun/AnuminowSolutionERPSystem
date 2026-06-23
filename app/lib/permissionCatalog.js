@@ -167,6 +167,18 @@ export const permissionCatalog = [
         module: 'Permission',
         defaultRoles: ['Admin'],
     },
+    {
+        key: 'master_data.view',
+        name: 'View Master Data',
+        module: 'Master Data',
+        defaultRoles: ['Admin', 'Manager'],
+    },
+    {
+        key: 'master_data.manage',
+        name: 'Manage Master Data',
+        module: 'Master Data',
+        defaultRoles: ['Admin'],
+    },
 ]
 
 export function getPermissionCatalogKeys() {

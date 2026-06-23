@@ -4,6 +4,7 @@ import { promises as fs } from 'fs'
 import path from 'path'
 import bcrypt from 'bcrypt'
 import { requirePermission } from '@/app/lib/permission'
+import { writeAuditLog } from '@/app/lib/auditLog'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -277,6 +278,22 @@ export async function POST(request) {
                 targetPermissionRoleId,
             ]
         )
+
+        await writeAuditLog({
+            actorId: auth.user.id,
+            action: 'employee.create',
+            entityType: 'employee',
+            entityId: createUserId,
+            summary: `Create employee ${createUserId}`,
+            metadata: {
+                employee_id: createUserId,
+                email,
+                department_id,
+                role_id,
+                permission_role_id: targetPermissionRoleId,
+                status: 'active',
+            },
+        })
 
         return NextResponse.json(
             {

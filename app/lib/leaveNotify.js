@@ -60,11 +60,13 @@ export async function getLeaveManagerUserIds(
         SELECT
             u.id
         FROM \`user\` u
-        INNER JOIN user_permission_role upr
-            ON upr.permission_role_id = u.permission_role_id
+        INNER JOIN permission_role_map prm
+            ON prm.permission_role_id = u.permission_role_id
+        INNER JOIN permission p
+            ON p.permission_id = prm.permission_id
         WHERE u.deleted_at IS NULL
         AND u.status = 'active'
-        AND upr.permission_role_name IN ('Admin', 'Manager')
+        AND p.permission_key = 'leave.approve'
         ${excludeSql}
         `,
         values

@@ -22,6 +22,11 @@ jobs:
           cd /home/ChidchanunServer/AnuminowSolutionERPSystem
           npm ci
 
+      - name: Seed permissions
+        run: |
+          cd /home/ChidchanunServer/AnuminowSolutionERPSystem
+          npm run seed:permissions
+
       - name: Run unit tests
         run: |
           cd /home/ChidchanunServer/AnuminowSolutionERPSystem

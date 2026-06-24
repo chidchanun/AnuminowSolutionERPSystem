@@ -91,3 +91,40 @@ body {
 .dark .sidebar-scroll::-webkit-scrollbar-thumb:hover {
     background: #64748b;
 }
+
+.a4-page {
+    width: 210mm;
+    min-height: 297mm;
+    background: white;
+    color: #0f172a;
+    padding: 16mm;
+    margin: 0 auto;
+    box-shadow: 0 10px 30px rgba(15, 23, 42, 0.15);
+}
+
+.a4-field {
+    page-break-inside: avoid;
+}
+
+@media print {
+    body {
+        background: white !important;
+    }
+
+    .no-print {
+        display: none !important;
+    }
+
+    .a4-page {
+        width: 210mm;
+        min-height: 297mm;
+        padding: 16mm;
+        margin: 0;
+        box-shadow: none;
+    }
+
+    @page {
+        size: A4;
+        margin: 0;
+    }
+}

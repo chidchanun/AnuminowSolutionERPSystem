@@ -111,12 +111,12 @@ export async function PUT(request) {
 
         const permissionIds = Array.isArray(body.permission_ids)
             ? [
-                  ...new Set(
-                      body.permission_ids
-                          .map(Number)
-                          .filter(Boolean)
-                  ),
-              ]
+                ...new Set(
+                    body.permission_ids
+                        .map(Number)
+                        .filter(Boolean)
+                ),
+            ]
             : []
 
         if (!permissionRoleId) {
@@ -164,7 +164,21 @@ export async function PUT(request) {
             [permissionRoleId]
         )
 
-        if (permissionIds.length > 0) {
+        if (targetRole.permission_role_name === 'Admin') {
+            await connection.execute(
+                `
+                INSERT IGNORE INTO permission_role_map (
+                    permission_role_id,
+                    permission_id
+                )
+                SELECT
+                    ?,
+                    permission_id
+                FROM permission
+                `,
+                [permissionRoleId]
+            )
+        } else if (permissionIds.length > 0) {
             for (const permissionId of permissionIds) {
                 await connection.execute(
                     `
@@ -174,10 +188,7 @@ export async function PUT(request) {
                     )
                     VALUES (?, ?)
                     `,
-                    [
-                        permissionRoleId,
-                        permissionId,
-                    ]
+                    [permissionRoleId, permissionId]
                 )
             }
         }

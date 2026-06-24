@@ -10,6 +10,7 @@ import {
     FiClock,
     FiDatabase,
     FiShield,
+    FiFileText 
 } from 'react-icons/fi'
 
 export const navGroups = [
@@ -30,7 +31,34 @@ export const navGroups = [
             },
         ],
     },
-
+    {
+        label: 'เอกสารและฟอร์ม',
+        items: [
+            {
+                label: 'แบบฟอร์ม',
+                icon: FiFileText,
+                href: '/dashboard/form',
+                permissionKey: 'form.view',
+                subMenu: [
+                    {
+                        label: 'รายการแบบฟอร์ม',
+                        href: '/dashboard/form',
+                        permissionKey: 'form.view',
+                    },
+                    {
+                        label: 'สร้างแบบฟอร์ม',
+                        href: '/dashboard/form/new',
+                        permissionKey: 'form.create',
+                    },
+                    {
+                        label: 'เอกสารที่ส่งแล้ว',
+                        href: '/dashboard/form/submission',
+                        permissionKey: 'form.view',
+                    },
+                ],
+            },
+        ],
+    },
     {
         label: 'HR',
         items: [

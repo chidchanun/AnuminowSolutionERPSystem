@@ -12,6 +12,7 @@ import {
     FiMail,
     FiTrash2,
     FiUser,
+    FiX,
 } from 'react-icons/fi'
 
 function formatDate(value) {
@@ -101,6 +102,8 @@ export default function EmployeeDetailPage() {
     })
 
     const [loading, setLoading] = useState(true)
+    const [confirmDelete, setConfirmDelete] = useState(false)
+    const [deleting, setDeleting] = useState(false)
     const [error, setError] = useState('')
 
     useEffect(() => {
@@ -160,13 +163,8 @@ export default function EmployeeDetailPage() {
     const deleteEmployee = async () => {
         if (!employee) return
 
-        const confirmed = window.confirm(
-            `ต้องการลบพนักงาน "${fullNameTh(employee)}" หรือไม่?`
-        )
-
-        if (!confirmed) return
-
         try {
+            setDeleting(true)
             const res = await fetch(
                 `/api/v1/employee/${employee.id}`,
                 {
@@ -188,6 +186,8 @@ export default function EmployeeDetailPage() {
         } catch (error) {
             console.error(error)
             setError(error.message)
+        } finally {
+            setDeleting(false)
         }
     }
 
@@ -243,7 +243,7 @@ export default function EmployeeDetailPage() {
                         {permission.can_delete && (
                             <button
                                 type="button"
-                                onClick={deleteEmployee}
+                                onClick={() => setConfirmDelete(true)}
                                 className="inline-flex items-center justify-center gap-2 rounded-2xl bg-red-500 px-4 py-2 text-sm text-white hover:bg-red-600"
                             >
                                 <FiTrash2 />
@@ -422,6 +422,49 @@ export default function EmployeeDetailPage() {
                     )}
                 </section>
             </div>
+
+            {confirmDelete && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 px-4 py-6">
+                    <div className="w-full max-w-md rounded-lg border border-slate-200 bg-white p-5 shadow-xl dark:border-slate-800 dark:bg-slate-900">
+                        <div className="flex items-start gap-4">
+                            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300">
+                                <FiTrash2 className="h-5 w-5" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                                <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                                    ยืนยันการลบพนักงาน
+                                </h2>
+                                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                                    ต้องการลบ {'"'}
+                                    {fullNameTh(employee)}
+                                    {'"'} ใช่ไหม?
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                            <button
+                                type="button"
+                                onClick={() => setConfirmDelete(false)}
+                                disabled={deleting}
+                                className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                            >
+                                <FiX className="h-4 w-4" />
+                                ยกเลิก
+                            </button>
+                            <button
+                                type="button"
+                                onClick={deleteEmployee}
+                                disabled={deleting}
+                                className="inline-flex items-center justify-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-700 disabled:opacity-60"
+                            >
+                                <FiTrash2 className="h-4 w-4" />
+                                {deleting ? 'กำลังลบ...' : 'ลบพนักงาน'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </main>
     )
 }

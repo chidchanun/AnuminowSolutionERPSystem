@@ -60,6 +60,26 @@ const pagePermissionRules = [
         permissionKey: 'notification.view',
     },
     {
+        pattern: /^\/dashboard\/form\/new\/?$/,
+        permissionKey: 'form.create',
+    },
+    {
+        pattern: /^\/dashboard\/form\/submission(?:\/[^/]+)?\/?$/,
+        permissionKey: 'form.view',
+    },
+    {
+        pattern: /^\/dashboard\/form\/[^/]+\/builder\/?$/,
+        permissionKey: 'form.update',
+    },
+    {
+        pattern: /^\/dashboard\/form\/[^/]+\/fill\/?$/,
+        permissionKey: 'form.fill',
+    },
+    {
+        pattern: /^\/dashboard\/form\/?$/,
+        permissionKey: 'form.view',
+    },
+    {
         pattern: /^\/dashboard\/permission\/?$/,
         permissionKey: 'permission.view',
     },

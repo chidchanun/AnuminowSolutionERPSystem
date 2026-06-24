@@ -9,7 +9,7 @@ export async function GET(request) {
         if (!province) {
             return NextResponse.json({ error: 'โปรดกรอกจังหวัด' }, { status: 400 })
         }
-        console.log(province)
+
         const [provinceData] = await db.query(
             "SELECT province_id, province_thai FROM province WHERE province_thai = ?",
             [province]
@@ -21,7 +21,6 @@ export async function GET(request) {
 
 
         const provinceId = provinceData[0].province_id
-        console.log(provinceId)
         const [districts] = await db.query(
             `
             SELECT 

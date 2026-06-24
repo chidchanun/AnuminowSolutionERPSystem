@@ -340,8 +340,6 @@ export default function CreateTaskPage() {
                 assignee_ids: assigneeIds,
             }
 
-            console.log('Create task payload:', payload)
-
             const res = await fetch('/api/v1/task', {
                 method: 'POST',
                 headers: {

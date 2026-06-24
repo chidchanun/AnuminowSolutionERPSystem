@@ -3,6 +3,8 @@ import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import vm from 'node:vm'
 
+process.env.JWT_SECRET ||= 'unit-test-secret'
+
 const loginRouteSource = await readFile(
     new URL('../app/api/v1/auth/login/route.js', import.meta.url),
     'utf8'
@@ -189,6 +191,8 @@ test('POST /api/v1/auth/login writes audit log on success', async () => {
                 department_name: 'IT',
                 role_name: 'Admin',
                 picture_path: null,
+                status: 'active',
+                deleted_at: null,
                 permission_role_name: 'Admin',
             },
         ]],
@@ -256,6 +260,8 @@ test('POST /api/v1/auth/login writes audit log when password is invalid', async 
             department_name: 'IT',
             role_name: 'Admin',
             picture_path: null,
+            status: 'active',
+            deleted_at: null,
             permission_role_name: 'Admin',
         },
     ]])

@@ -185,8 +185,6 @@ export default function EmployeePage() {
           roleRes.json(),
         ])
 
-        console.log(employeeData)
-
         setEmployees(
           Array.isArray(employeeData)
             ? employeeData

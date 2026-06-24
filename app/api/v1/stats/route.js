@@ -1,8 +1,12 @@
 import { db } from '@/app/lib/db'
 import { NextResponse } from 'next/server'
+import { requirePermission } from '@/app/lib/permission'
 
 export async function GET(request) {
   try {
+    const auth = await requirePermission(request, 'dashboard.view')
+    if (auth.response) return auth.response
+
     const url = new URL(request.url)
     const type = url.searchParams.get('type')
 

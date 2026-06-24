@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/app/lib/db'
 import { requirePermission } from '@/app/lib/permission'
+import { writeAuditLog } from '@/app/lib/auditLog'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -26,6 +27,81 @@ function createSubmissionNo(templateId) {
     return `FORM-${templateId}-${y}${m}${d}-${time}`
 }
 
+function hasTextValue(value) {
+    return value !== undefined &&
+        value !== null &&
+        String(value).trim() !== ''
+}
+
+function getRequiredTableErrors(field, value) {
+    const rows = Array.isArray(value) ? value : []
+    const requiredColumns = Array.isArray(field.requiredColumns)
+        ? field.requiredColumns.filter(Boolean)
+        : []
+
+    const filledRows = rows.filter((row) =>
+        row &&
+        Object.values(row).some((cell) => hasTextValue(cell))
+    )
+
+    if (field.required && filledRows.length === 0) {
+        return [`${field.label || 'Table'} ต้องมีข้อมูลอย่างน้อย 1 แถว`]
+    }
+
+    if (requiredColumns.length === 0) {
+        return []
+    }
+
+    const errors = []
+
+    filledRows.forEach((row, index) => {
+        requiredColumns.forEach((column) => {
+            if (!hasTextValue(row?.[column])) {
+                errors.push(
+                    `${field.label || 'Table'} แถว ${index + 1} ต้องกรอก ${column}`
+                )
+            }
+        })
+    })
+
+    return errors
+}
+
+function validateField(field, dataJson) {
+    if (
+        field.type === 'page_break' ||
+        field.type === 'static_text'
+    ) {
+        return []
+    }
+
+    const value = dataJson[field.id]
+
+    if (field.type === 'table') {
+        return getRequiredTableErrors(field, value)
+    }
+
+    if (!field.required) {
+        return []
+    }
+
+    if (field.type === 'checkbox') {
+        return Array.isArray(value) && value.length > 0
+            ? []
+            : [`${field.label || 'Checkbox'} ต้องเลือกอย่างน้อย 1 ตัวเลือก`]
+    }
+
+    if (field.type === 'signature') {
+        return hasTextValue(value)
+            ? []
+            : [`${field.label || 'Signature'} ต้องลงชื่อ`]
+    }
+
+    return hasTextValue(value)
+        ? []
+        : [field.label || 'Field']
+}
+
 export async function POST(request, context) {
     try {
         const auth = await requirePermission(request, 'form.fill')
@@ -34,6 +110,13 @@ export async function POST(request, context) {
         const user = auth.user
         const { id } = await context.params
         const templateId = Number(id)
+
+        if (!templateId) {
+            return NextResponse.json(
+                { success: false, message: 'form_template_id ไม่ถูกต้อง' },
+                { status: 400 }
+            )
+        }
 
         const body = await request.json().catch(() => null)
 
@@ -48,7 +131,11 @@ export async function POST(request, context) {
             `
             SELECT
                 form_template_id,
+                form_name,
+                form_code,
+                description,
                 layout_json,
+                version,
                 status
             FROM form_template
             WHERE form_template_id = ?
@@ -78,25 +165,15 @@ export async function POST(request, context) {
         const fields = Array.isArray(layout.fields) ? layout.fields : []
         const dataJson = body.data_json || {}
 
-        const missingFields = fields
-            .filter((field) => field.type !== 'page_break')
-            .filter((field) => field.required)
-            .filter((field) => {
-                const value = dataJson[field.id]
+        const validationErrors = fields.flatMap((field) =>
+            validateField(field, dataJson)
+        )
 
-                if (field.type === 'table') {
-                    return false
-                }
-
-                return value === undefined || value === null || String(value).trim() === ''
-            })
-
-
-        if (missingFields.length > 0) {
+        if (validationErrors.length > 0) {
             return NextResponse.json(
                 {
                     success: false,
-                    message: `กรุณากรอกข้อมูลให้ครบ: ${missingFields.map((f) => f.label).join(', ')}`,
+                    message: `กรุณากรอกข้อมูลให้ครบ: ${validationErrors.join(', ')}`,
                 },
                 { status: 400 }
             )
@@ -110,18 +187,59 @@ export async function POST(request, context) {
                 form_template_id,
                 submission_no,
                 data_json,
+                template_version,
+                form_name_snapshot,
+                form_code_snapshot,
+                description_snapshot,
+                layout_snapshot_json,
                 status,
                 submitted_by
             )
-            VALUES (?, ?, ?, 'submitted', ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'submitted', ?)
             `,
             [
                 templateId,
                 submissionNo,
                 JSON.stringify(dataJson),
+                Number(template.version || 1),
+                template.form_name,
+                template.form_code,
+                template.description || null,
+                JSON.stringify(layout),
                 user.id,
             ]
         )
+
+        await db.execute(
+            `
+            INSERT INTO form_submission_history (
+                form_submission_id,
+                from_status,
+                to_status,
+                action,
+                comment,
+                changed_by
+            )
+            VALUES (?, NULL, 'submitted', 'submit', NULL, ?)
+            `,
+            [
+                result.insertId,
+                user.id,
+            ]
+        )
+
+        await writeAuditLog({
+            actorId: user.id,
+            action: 'form_submission.create',
+            entityType: 'form_submission',
+            entityId: result.insertId,
+            summary: `Submit form ${submissionNo}`,
+            metadata: {
+                form_submission_id: result.insertId,
+                form_template_id: templateId,
+                submission_no: submissionNo,
+            },
+        })
 
         return NextResponse.json(
             {

@@ -13,6 +13,7 @@ export default function EditProjectPage() {
     const [showSuccess, setShowSuccess] = useState(false)
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
+    const [error, setError] = useState('')
 
     const [formData, setFormData] = useState({
         project_name: '',
@@ -31,10 +32,16 @@ export default function EditProjectPage() {
     useEffect(() => {
         const fetchData = async () => {
             try {
+                setError('')
+
                 const [projectRes, userRes] = await Promise.all([
                     fetch(`/api/v1/project/${params.id}`),
                     fetch('/api/v1/user')
                 ])
+
+                if (!projectRes.ok || !userRes.ok) {
+                    throw new Error('Load project data failed')
+                }
 
                 const projectData = await projectRes.json()
                 const userData = await userRes.json()
@@ -56,6 +63,7 @@ export default function EditProjectPage() {
             }
             catch (error) {
                 console.error(error)
+                setError(error.message || 'Load project data failed')
             }
             finally {
                 setLoading(false)
@@ -81,6 +89,7 @@ export default function EditProjectPage() {
 
         try {
             setSaving(true)
+            setError('')
 
             const res = await fetch(
                 `/api/v1/project/${params.id}`,
@@ -101,7 +110,7 @@ export default function EditProjectPage() {
             const data = await res.json()
 
             if (!res.ok) {
-                alert(data.message)
+                setError(data.message || 'Update project failed')
                 return
             }
 
@@ -109,7 +118,7 @@ export default function EditProjectPage() {
 
         } catch (error) {
             console.error(error)
-            alert('เกิดข้อผิดพลาด')
+            setError(error.message || 'Update project failed')
         } finally {
             setSaving(false)
         }
@@ -162,6 +171,12 @@ export default function EditProjectPage() {
                         แก้ไขข้อมูลโปรเจกต์ในระบบ
                     </p>
                 </div>
+
+                {error && (
+                    <div className="mb-5 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600 dark:border-red-900 dark:bg-red-950 dark:text-red-300">
+                        {error}
+                    </div>
+                )}
 
                 <form
                     onSubmit={handleSubmit}

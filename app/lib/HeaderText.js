@@ -10,6 +10,36 @@ const headerRules = [
         welcome: 'ติดตามการแจ้งเตือนและรายการที่ต้องรับทราบ',
     },
     {
+        pattern: /^\/dashboard\/form\/new\/?$/,
+        title: 'Create Form',
+        welcome: 'Create reusable document forms and templates',
+    },
+    {
+        pattern: /^\/dashboard\/form\/submission\/[^/]+\/?$/,
+        title: 'Form Submission Detail',
+        welcome: 'Review submitted form data and export documents',
+    },
+    {
+        pattern: /^\/dashboard\/form\/submission\/?$/,
+        title: 'Form Submissions',
+        welcome: 'Review form submissions from users',
+    },
+    {
+        pattern: /^\/dashboard\/form\/[^/]+\/builder\/?$/,
+        title: 'Form Builder',
+        welcome: 'Edit form fields, document layout, header, and footer',
+    },
+    {
+        pattern: /^\/dashboard\/form\/[^/]+\/fill\/?$/,
+        title: 'Fill Form',
+        welcome: 'Fill and submit the selected form',
+    },
+    {
+        pattern: /^\/dashboard\/form\/?$/,
+        title: 'Forms',
+        welcome: 'Create, fill, and manage document forms',
+    },
+    {
         pattern: /^\/dashboard\/employee\/new\/?$/,
         title: 'Create Employee',
         welcome: 'เพิ่มข้อมูลพนักงานใหม่เข้าสู่ระบบ',

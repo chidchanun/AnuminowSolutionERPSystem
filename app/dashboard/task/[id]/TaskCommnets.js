@@ -102,6 +102,7 @@ export default function TaskComments({
 
     const [editingId, setEditingId] = useState(null)
     const [editingText, setEditingText] = useState('')
+    const [confirmDelete, setConfirmDelete] = useState(null)
 
     const [loading, setLoading] = useState(true)
     const [submitting, setSubmitting] = useState(false)
@@ -350,11 +351,6 @@ export default function TaskComments({
     }
 
     const deleteComment = async (commentId) => {
-        const confirmed =
-            window.confirm('ต้องการลบ comment นี้หรือไม่?')
-
-        if (!confirmed) return
-
         try {
             setSubmitting(true)
 
@@ -376,6 +372,7 @@ export default function TaskComments({
             }
 
             setError('')
+            setConfirmDelete(null)
             await loadComments()
         } catch (error) {
             console.error(error)
@@ -515,6 +512,36 @@ export default function TaskComments({
                 </div>
             )}
 
+            {confirmDelete && (
+                <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <p>
+                            ต้องการลบ comment นี้ใช่ไหม?
+                        </p>
+                        <div className="flex gap-2">
+                            <button
+                                type="button"
+                                onClick={() => setConfirmDelete(null)}
+                                disabled={submitting}
+                                className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-700 hover:bg-slate-50 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                            >
+                                <FiX className="h-4 w-4" />
+                                ยกเลิก
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => deleteComment(confirmDelete.comment_id)}
+                                disabled={submitting}
+                                className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-3 py-2 font-medium text-white hover:bg-red-700 disabled:opacity-60"
+                            >
+                                <FiTrash2 className="h-4 w-4" />
+                                {submitting ? 'กำลังลบ...' : 'ลบ'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             <form
                 onSubmit={handleSubmit}
                 className="mb-5"
@@ -608,11 +635,7 @@ export default function TaskComments({
 
                                                     <button
                                                         type="button"
-                                                        onClick={() =>
-                                                            deleteComment(
-                                                                comment.comment_id
-                                                            )
-                                                        }
+                                                        onClick={() => setConfirmDelete(comment)}
                                                         className="rounded-lg p-2 text-slate-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-950"
                                                     >
                                                         <FiTrash2 />
@@ -729,11 +752,7 @@ export default function TaskComments({
 
                                                                             <button
                                                                                 type="button"
-                                                                                onClick={() =>
-                                                                                    deleteComment(
-                                                                                        reply.comment_id
-                                                                                    )
-                                                                                }
+                                                                                onClick={() => setConfirmDelete(reply)}
                                                                                 className="rounded-lg p-2 text-slate-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-950"
                                                                             >
                                                                                 <FiTrash2 />

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/app/lib/db'
 import { requirePermission } from '@/app/lib/permission'
+import { writeAuditLog } from '@/app/lib/auditLog'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -30,20 +31,28 @@ export async function GET(request, context) {
                 fs.form_template_id,
                 fs.submission_no,
                 fs.data_json,
+                fs.template_version,
                 fs.status,
                 fs.submitted_by,
                 fs.submitted_at,
+                fs.decided_by,
+                fs.decided_at,
+                fs.decision_comment,
 
-                ft.form_name,
-                ft.form_code,
-                ft.layout_json,
+                COALESCE(fs.form_name_snapshot, ft.form_name) AS form_name,
+                COALESCE(fs.form_code_snapshot, ft.form_code) AS form_code,
+                COALESCE(fs.description_snapshot, ft.description) AS description,
+                COALESCE(fs.layout_snapshot_json, ft.layout_json) AS layout_json,
 
-                CONCAT(u.first_name_th, ' ', u.last_name_th) AS submitted_by_name
+                CONCAT(u.first_name_th, ' ', u.last_name_th) AS submitted_by_name,
+                CONCAT(du.first_name_th, ' ', du.last_name_th) AS decided_by_name
             FROM form_submission fs
             INNER JOIN form_template ft
                 ON ft.form_template_id = fs.form_template_id
             INNER JOIN \`user\` u
                 ON u.id = fs.submitted_by
+            LEFT JOIN \`user\` du
+                ON du.id = fs.decided_by
             WHERE fs.form_submission_id = ?
             AND fs.deleted_at IS NULL
             LIMIT 1
@@ -60,12 +69,33 @@ export async function GET(request, context) {
             )
         }
 
+        const [historyRows] = await db.execute(
+            `
+            SELECT
+                h.history_id,
+                h.from_status,
+                h.to_status,
+                h.action,
+                h.comment,
+                h.changed_by,
+                h.created_at,
+                CONCAT(u.first_name_th, ' ', u.last_name_th) AS changed_by_name
+            FROM form_submission_history h
+            LEFT JOIN \`user\` u
+                ON u.id = h.changed_by
+            WHERE h.form_submission_id = ?
+            ORDER BY h.created_at ASC, h.history_id ASC
+            `,
+            [Number(id)]
+        )
+
         return NextResponse.json({
             success: true,
             submission: {
                 ...submission,
                 data_json: safeJson(submission.data_json, {}),
                 layout_json: safeJson(submission.layout_json, {}),
+                history: historyRows,
             },
         })
     } catch (error) {
@@ -75,6 +105,179 @@ export async function GET(request, context) {
             {
                 success: false,
                 message: 'โหลดเอกสารไม่สำเร็จ',
+                error_detail:
+                    process.env.NODE_ENV === 'development'
+                        ? error.message
+                        : undefined,
+            },
+            { status: 500 }
+        )
+    }
+}
+
+export async function PATCH(request, context) {
+    try {
+        const auth = await requirePermission(request, 'form.approve')
+        if (auth.response) return auth.response
+
+        const user = auth.user
+        const { id } = await context.params
+        const submissionId = Number(id)
+        const body = await request.json().catch(() => null)
+
+        if (!submissionId) {
+            return NextResponse.json(
+                { success: false, message: 'form_submission_id ไม่ถูกต้อง' },
+                { status: 400 }
+            )
+        }
+
+        if (!body) {
+            return NextResponse.json(
+                { success: false, message: 'รูปแบบข้อมูลไม่ถูกต้อง' },
+                { status: 400 }
+            )
+        }
+
+        const action = String(body.action || '').trim()
+        const comment = String(body.comment || '').trim()
+
+        if (!['approve', 'reject'].includes(action)) {
+            return NextResponse.json(
+                { success: false, message: 'action ไม่ถูกต้อง' },
+                { status: 400 }
+            )
+        }
+
+        if (action === 'reject' && !comment) {
+            return NextResponse.json(
+                { success: false, message: 'กรุณากรอกเหตุผลการ Reject' },
+                { status: 400 }
+            )
+        }
+
+        const [rows] = await db.execute(
+            `
+            SELECT
+                form_submission_id,
+                form_template_id,
+                submission_no,
+                status,
+                submitted_by
+            FROM form_submission
+            WHERE form_submission_id = ?
+            AND deleted_at IS NULL
+            LIMIT 1
+            `,
+            [submissionId]
+        )
+
+        const submission = rows[0]
+
+        if (!submission) {
+            return NextResponse.json(
+                { success: false, message: 'ไม่พบเอกสาร' },
+                { status: 404 }
+            )
+        }
+
+        if (String(submission.submitted_by) === String(user.id)) {
+            return NextResponse.json(
+                { success: false, message: 'ไม่สามารถอนุมัติเอกสารของตัวเองได้' },
+                { status: 403 }
+            )
+        }
+
+        if (submission.status !== 'submitted') {
+            return NextResponse.json(
+                { success: false, message: 'เอกสารนี้ถูกตัดสินแล้ว' },
+                { status: 409 }
+            )
+        }
+
+        const nextStatus = action === 'approve'
+            ? 'approved'
+            : 'rejected'
+
+        const [result] = await db.execute(
+            `
+            UPDATE form_submission
+            SET
+                status = ?,
+                decided_by = ?,
+                decided_at = CURRENT_TIMESTAMP,
+                decision_comment = ?
+            WHERE form_submission_id = ?
+            AND status = 'submitted'
+            AND deleted_at IS NULL
+            `,
+            [
+                nextStatus,
+                user.id,
+                comment || null,
+                submissionId,
+            ]
+        )
+
+        if (result.affectedRows === 0) {
+            return NextResponse.json(
+                { success: false, message: 'ไม่สามารถอัปเดตสถานะเอกสารได้' },
+                { status: 409 }
+            )
+        }
+
+        await db.execute(
+            `
+            INSERT INTO form_submission_history (
+                form_submission_id,
+                from_status,
+                to_status,
+                action,
+                comment,
+                changed_by
+            )
+            VALUES (?, ?, ?, ?, ?, ?)
+            `,
+            [
+                submissionId,
+                submission.status,
+                nextStatus,
+                action,
+                comment || null,
+                user.id,
+            ]
+        )
+
+        await writeAuditLog({
+            actorId: user.id,
+            action: `form_submission.${action}`,
+            entityType: 'form_submission',
+            entityId: submissionId,
+            summary: `${action} form submission ${submission.submission_no}`,
+            metadata: {
+                form_submission_id: submissionId,
+                form_template_id: submission.form_template_id,
+                submission_no: submission.submission_no,
+                from_status: submission.status,
+                to_status: nextStatus,
+                comment: comment || null,
+            },
+        })
+
+        return NextResponse.json({
+            success: true,
+            message: action === 'approve'
+                ? 'อนุมัติเอกสารสำเร็จ'
+                : 'Reject เอกสารสำเร็จ',
+            status: nextStatus,
+        })
+    } catch (error) {
+        console.error('Form Submission PATCH Error:', error)
+
+        return NextResponse.json(
+            {
+                success: false,
+                message: 'อัปเดตสถานะเอกสารไม่สำเร็จ',
                 error_detail:
                     process.env.NODE_ENV === 'development'
                         ? error.message

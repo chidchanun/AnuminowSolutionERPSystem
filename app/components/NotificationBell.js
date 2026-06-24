@@ -196,10 +196,6 @@ export default function NotificationBell() {
             transports: ['websocket', 'polling'],
         })
 
-        socket.on('connect', () => {
-            console.log('Socket connected')
-        })
-
         socket.on('connect_error', (error) => {
             console.error('Socket connect error:', error.message)
         })

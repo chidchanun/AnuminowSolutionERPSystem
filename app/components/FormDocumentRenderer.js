@@ -1,5 +1,7 @@
 'use client'
 
+/* eslint-disable @next/next/no-img-element */
+
 function paginateFields(fields = []) {
     const pages = [
         {
@@ -65,6 +67,67 @@ function normalizeColumns(field) {
     return Array.isArray(field.columns) && field.columns.length
         ? field.columns
         : ['รายการ']
+}
+
+function normalizeTextAlign(value) {
+    return ['left', 'center', 'right'].includes(value)
+        ? value
+        : 'left'
+}
+
+function getIndentLevel(value) {
+    const parsed = Number(value)
+
+    if (!Number.isFinite(parsed)) {
+        return 0
+    }
+
+    return Math.min(Math.max(Math.trunc(parsed), 0), 6)
+}
+
+function getBoundedNumber(value, fallback, min, max) {
+    const parsed = Number(value)
+
+    if (!Number.isFinite(parsed)) {
+        return fallback
+    }
+
+    return Math.min(Math.max(Math.trunc(parsed), min), max)
+}
+
+function getStaticTextStyle(field) {
+    return {
+        fontSize: `${getBoundedNumber(field?.fontSize, 14, 8, 36)}px`,
+        fontWeight: field?.bold ? 700 : 400,
+        textDecoration: field?.underline ? 'underline' : 'none',
+        lineHeight: 1.65,
+        marginTop: `${getBoundedNumber(field?.spaceBefore, 0, 0, 80)}px`,
+        marginBottom: `${getBoundedNumber(field?.spaceAfter, 0, 0, 80)}px`,
+    }
+}
+
+function getRequiredColumns(field) {
+    return Array.isArray(field?.requiredColumns)
+        ? field.requiredColumns.filter(Boolean)
+        : []
+}
+
+function getFieldTextStyle(field) {
+    return {
+        textAlign: normalizeTextAlign(field?.textAlign),
+        paddingLeft: `${getIndentLevel(field?.indentLevel) * 18}px`,
+    }
+}
+
+function getAlignedOptionClass(field) {
+    switch (normalizeTextAlign(field?.textAlign)) {
+        case 'center':
+            return 'justify-center text-center'
+        case 'right':
+            return 'justify-end text-right'
+        default:
+            return 'justify-start text-left'
+    }
 }
 
 function DocumentHeader({ config }) {
@@ -194,19 +257,38 @@ export default function FormDocumentRenderer({
                                 const value = getFieldValue(data, field.id, '')
                                 const options = normalizeOptions(field)
                                 const columns = normalizeColumns(field)
+                                const requiredColumns = getRequiredColumns(field)
                                 const rowCount = Number(field.rows) || 3
+                                const textAlign = normalizeTextAlign(field.textAlign)
+                                const textStyle = getFieldTextStyle(field)
+                                const optionClass = getAlignedOptionClass(field)
 
                                 return (
                                     <div
                                         key={field.id}
                                         className={`a4-field ${getWidthClass(field)}`}
+                                        style={textStyle}
                                     >
-                                        <label className="mb-2 block text-sm font-semibold text-slate-900">
-                                            {field.label}
-                                            {field.required && (
-                                                <span className="ml-1 text-red-500">*</span>
-                                            )}
-                                        </label>
+                                        {field.type !== 'static_text' && (
+                                            <label className="mb-2 block text-sm font-semibold text-slate-900">
+                                                {field.label}
+                                                {field.required && (
+                                                    <span className="ml-1 text-red-500">*</span>
+                                                )}
+                                            </label>
+                                        )}
+
+                                        {field.type === 'static_text' && (
+                                            <div
+                                                className="min-h-10 whitespace-pre-wrap py-1 text-sm leading-6 text-slate-900"
+                                                style={{
+                                                    textAlign,
+                                                    ...getStaticTextStyle(field),
+                                                }}
+                                            >
+                                                {field.content || field.label || '-'}
+                                            </div>
+                                        )}
 
                                         {field.type === 'text' && (
                                             editable ? (
@@ -216,10 +298,18 @@ export default function FormDocumentRenderer({
                                                         updateValue(field.id, e.target.value)
                                                     }
                                                     placeholder={field.placeholder || ''}
+                                                    style={{
+                                                        textAlign,
+                                                    }}
                                                     className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:border-sky-500"
                                                 />
                                             ) : (
-                                                <div className="min-h-9 border-b border-slate-400 px-1 py-2 text-sm text-slate-900">
+                                                <div
+                                                    className="min-h-9 border-b border-slate-400 px-1 py-2 text-sm text-slate-900"
+                                                    style={{
+                                                        textAlign,
+                                                    }}
+                                                >
                                                     {value || '-'}
                                                 </div>
                                             )
@@ -233,10 +323,18 @@ export default function FormDocumentRenderer({
                                                     onChange={(e) =>
                                                         updateValue(field.id, e.target.value)
                                                     }
+                                                    style={{
+                                                        textAlign,
+                                                    }}
                                                     className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:border-sky-500"
                                                 />
                                             ) : (
-                                                <div className="min-h-9 border-b border-slate-400 px-1 py-2 text-sm text-slate-900">
+                                                <div
+                                                    className="min-h-9 border-b border-slate-400 px-1 py-2 text-sm text-slate-900"
+                                                    style={{
+                                                        textAlign,
+                                                    }}
+                                                >
                                                     {value || '-'}
                                                 </div>
                                             )
@@ -250,10 +348,18 @@ export default function FormDocumentRenderer({
                                                         updateValue(field.id, e.target.value)
                                                     }
                                                     placeholder={field.placeholder || ''}
+                                                    style={{
+                                                        textAlign,
+                                                    }}
                                                     className="min-h-28 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:border-sky-500"
                                                 />
                                             ) : (
-                                                <div className="min-h-28 whitespace-pre-wrap rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-900">
+                                                <div
+                                                    className="min-h-28 whitespace-pre-wrap rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-900"
+                                                    style={{
+                                                        textAlign,
+                                                    }}
+                                                >
                                                     {value || '-'}
                                                 </div>
                                             )
@@ -266,6 +372,9 @@ export default function FormDocumentRenderer({
                                                     onChange={(e) =>
                                                         updateValue(field.id, e.target.value)
                                                     }
+                                                    style={{
+                                                        textAlign,
+                                                    }}
                                                     className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:border-sky-500"
                                                 >
                                                     <option value="">เลือกข้อมูล</option>
@@ -280,7 +389,12 @@ export default function FormDocumentRenderer({
                                                     ))}
                                                 </select>
                                             ) : (
-                                                <div className="min-h-9 rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-900">
+                                                <div
+                                                    className="min-h-9 rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-900"
+                                                    style={{
+                                                        textAlign,
+                                                    }}
+                                                >
                                                     {value || '-'}
                                                 </div>
                                             )
@@ -294,7 +408,7 @@ export default function FormDocumentRenderer({
                                                     return (
                                                         <label
                                                             key={`${field.id}-${option}-${index}`}
-                                                            className="flex items-center gap-2 text-sm text-slate-700"
+                                                            className={`flex w-full items-center gap-2 text-sm text-slate-700 ${optionClass}`}
                                                         >
                                                             <input
                                                                 type="radio"
@@ -322,7 +436,7 @@ export default function FormDocumentRenderer({
                                                     return (
                                                         <label
                                                             key={`${field.id}-${option}-${index}`}
-                                                            className="flex items-center gap-2 text-sm text-slate-700"
+                                                            className={`flex w-full items-center gap-2 text-sm text-slate-700 ${optionClass}`}
                                                         >
                                                             <input
                                                                 type="checkbox"
@@ -350,9 +464,15 @@ export default function FormDocumentRenderer({
                                                             {columns.map((column, colIndex) => (
                                                                 <th
                                                                     key={`${field.id}-head-${colIndex}`}
-                                                                    className="border border-slate-300 px-2 py-2 text-left"
+                                                                    className="border border-slate-300 px-2 py-2"
+                                                                    style={{
+                                                                        textAlign,
+                                                                    }}
                                                                 >
                                                                     {column}
+                                                                    {requiredColumns.includes(column) && (
+                                                                        <span className="ml-1 text-red-500">*</span>
+                                                                    )}
                                                                 </th>
                                                             ))}
                                                         </tr>
@@ -385,10 +505,18 @@ export default function FormDocumentRenderer({
                                                                                                 e.target.value
                                                                                             )
                                                                                         }
+                                                                                        style={{
+                                                                                            textAlign,
+                                                                                        }}
                                                                                         className="w-full border-none bg-transparent px-1 py-1 text-sm outline-none"
                                                                                     />
                                                                                 ) : (
-                                                                                    <span className="text-sm text-slate-900">
+                                                                                    <span
+                                                                                        className="block text-sm text-slate-900"
+                                                                                        style={{
+                                                                                            textAlign,
+                                                                                        }}
+                                                                                    >
                                                                                         {cellValue || '-'}
                                                                                     </span>
                                                                                 )}
@@ -412,18 +540,36 @@ export default function FormDocumentRenderer({
                                                             updateValue(field.id, e.target.value)
                                                         }
                                                         placeholder="พิมพ์ชื่อผู้ลงนาม"
-                                                        className="w-full border-b border-slate-400 bg-transparent px-2 py-2 text-center text-sm outline-none"
+                                                        style={{
+                                                            textAlign,
+                                                        }}
+                                                        className="w-full border-b border-slate-400 bg-transparent px-2 py-2 text-sm outline-none"
                                                     />
-                                                    <p className="mt-2 text-center text-xs text-slate-500">
+                                                    <p
+                                                        className="mt-2 text-xs text-slate-500"
+                                                        style={{
+                                                            textAlign,
+                                                        }}
+                                                    >
                                                         ลงชื่อ / Signature
                                                     </p>
                                                 </div>
                                             ) : (
                                                 <div className="pt-8">
-                                                    <div className="border-b border-slate-400 px-2 py-2 text-center text-sm text-slate-900">
+                                                    <div
+                                                        className="border-b border-slate-400 px-2 py-2 text-sm text-slate-900"
+                                                        style={{
+                                                            textAlign,
+                                                        }}
+                                                    >
                                                         {value || '-'}
                                                     </div>
-                                                    <p className="mt-2 text-center text-xs text-slate-500">
+                                                    <p
+                                                        className="mt-2 text-xs text-slate-500"
+                                                        style={{
+                                                            textAlign,
+                                                        }}
+                                                    >
                                                         ลงชื่อ / Signature
                                                     </p>
                                                 </div>

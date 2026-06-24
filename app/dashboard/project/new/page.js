@@ -13,6 +13,8 @@ export default function CreateProjectPage() {
     const [showMemberModal, setShowMemberModal] = useState(false)
     const [search, setSearch] = useState('')
     const [showSuccess, setShowSuccess] = useState(false)
+    const [error, setError] = useState('')
+    const [createdProjectId, setCreatedProjectId] = useState(null)
 
     const [saving, setSaving] = useState(false)
 
@@ -65,6 +67,7 @@ export default function CreateProjectPage() {
         try {
 
             setSaving(true)
+            setError('')
 
             const payload = {
                 ...formData,
@@ -87,17 +90,18 @@ export default function CreateProjectPage() {
             const data = await res.json()
 
             if (!res.ok) {
-                alert(data.message)
+                setError(data.message || 'Create project failed')
                 return
             }
 
+            setCreatedProjectId(data.project_id || null)
             setShowSuccess(true)
 
 
         } catch (error) {
 
             console.error(error)
-            alert('เกิดข้อผิดพลาด')
+            setError(error.message || 'Create project failed')
 
         } finally {
 
@@ -135,6 +139,12 @@ export default function CreateProjectPage() {
                         สร้างโปรเจกต์ใหม่ในระบบ
                     </p>
                 </div>
+
+                {error && (
+                    <div className="mb-5 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600 dark:border-red-900 dark:bg-red-950 dark:text-red-300">
+                        {error}
+                    </div>
+                )}
 
                 <form
                     onSubmit={handleSubmit}
@@ -496,7 +506,9 @@ export default function CreateProjectPage() {
                                 <button
                                     onClick={() =>
                                         router.push(
-                                            `/dashboard/project/${params.id}`
+                                            createdProjectId
+                                                ? `/dashboard/project/${createdProjectId}`
+                                                : '/dashboard/project'
                                         )
                                     }
                                     className="flex-1 rounded-xl bg-sky-500 px-4 py-3 text-white hover:bg-sky-600"

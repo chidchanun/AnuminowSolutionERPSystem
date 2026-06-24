@@ -11,6 +11,7 @@
     "seed:permissions": "node scripts/seed-permissions.mjs",
     "seed:permissions:dry": "node scripts/seed-permissions.mjs --dry-run",
     "setup:audit-log": "node scripts/setup-audit-log.mjs",
+    "setup:form": "node scripts/setup-form.mjs",
     "setup:master-data": "node scripts/setup-master-data.mjs",
     "setup:admin-user": "node scripts/setup-admin-user.mjs"
   },

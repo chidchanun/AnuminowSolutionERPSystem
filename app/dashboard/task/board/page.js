@@ -327,7 +327,7 @@ export default function TaskBoardPage() {
             }))
         } catch (error) {
             console.error(error)
-            alert(error.message)
+            setError(error.message)
         } finally {
             setUpdatingTaskId(null)
             setDraggingTask(null)

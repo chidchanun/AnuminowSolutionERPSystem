@@ -12,6 +12,48 @@ export const permissionCatalog = [
         defaultRoles: ['Admin', 'Manager', 'Team Lead', 'Employee'],
     },
     {
+        key: 'form.view',
+        name: 'View Forms',
+        module: 'Form',
+        defaultRoles: ['Admin', 'Manager', 'Team Lead', 'Employee'],
+    },
+    {
+        key: 'form.create',
+        name: 'Create Forms',
+        module: 'Form',
+        defaultRoles: ['Admin', 'Manager'],
+    },
+    {
+        key: 'form.update',
+        name: 'Update Forms',
+        module: 'Form',
+        defaultRoles: ['Admin', 'Manager'],
+    },
+    {
+        key: 'form.delete',
+        name: 'Delete Forms',
+        module: 'Form',
+        defaultRoles: ['Admin'],
+    },
+    {
+        key: 'form.fill',
+        name: 'Fill Forms',
+        module: 'Form',
+        defaultRoles: ['Admin', 'Manager', 'Team Lead', 'Employee'],
+    },
+    {
+        key: 'form.export',
+        name: 'Export Form Submissions',
+        module: 'Form',
+        defaultRoles: ['Admin', 'Manager'],
+    },
+    {
+        key: 'form.approve',
+        name: 'Approve Form Submissions',
+        module: 'Form',
+        defaultRoles: ['Admin', 'Manager'],
+    },
+    {
         key: 'employee.view',
         name: 'View Employees',
         module: 'Employee',

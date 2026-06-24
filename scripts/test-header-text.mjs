@@ -30,6 +30,8 @@ test('getHeaderTitle resolves dashboard and admin routes', () => {
     assert.equal(getHeaderTitle('/dashboard/permission'), 'Permission Matrix')
     assert.equal(getHeaderTitle('/dashboard/master-data'), 'Master Data')
     assert.equal(getHeaderTitle('/dashboard/notification'), 'Notifications')
+    assert.equal(getHeaderTitle('/dashboard/form'), 'Forms')
+    assert.equal(getHeaderTitle('/dashboard/form/submission'), 'Form Submissions')
 })
 
 test('getHeaderTitle resolves dynamic resource routes by priority', () => {
@@ -43,6 +45,13 @@ test('getHeaderTitle resolves dynamic resource routes by priority', () => {
     assert.equal(getHeaderTitle('/dashboard/project/42'), 'Project Detail')
     assert.equal(getHeaderTitle('/dashboard/task/42/edit'), 'Edit Task')
     assert.equal(getHeaderTitle('/dashboard/task/42'), 'Task Detail')
+    assert.equal(getHeaderTitle('/dashboard/form/new'), 'Create Form')
+    assert.equal(getHeaderTitle('/dashboard/form/12/builder'), 'Form Builder')
+    assert.equal(getHeaderTitle('/dashboard/form/12/fill'), 'Fill Form')
+    assert.equal(
+        getHeaderTitle('/dashboard/form/submission/22'),
+        'Form Submission Detail'
+    )
 })
 
 test('getWelcomeText returns a route-specific subtitle', () => {

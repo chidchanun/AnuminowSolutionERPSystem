@@ -77,6 +77,7 @@ export default function LeavePage() {
     const [saving, setSaving] = useState(false)
     const [actionSaving, setActionSaving] = useState(false)
     const [confirmAction, setConfirmAction] = useState(null)
+    const [confirmDelete, setConfirmDelete] = useState(null)
     const [error, setError] = useState('')
 
     const [formData, setFormData] = useState({
@@ -244,10 +245,8 @@ export default function LeavePage() {
     }
 
     const deleteLeave = async (leaveId) => {
-        const confirmed = window.confirm('ต้องการลบคำขอนี้หรือไม่?')
-        if (!confirmed) return
-
         try {
+            setActionSaving(true)
             const res = await fetch(`/api/v1/leave/${leaveId}`, {
                 method: 'DELETE',
             })
@@ -263,9 +262,12 @@ export default function LeavePage() {
             }
 
             await loadLeaves()
+            setConfirmDelete(null)
         } catch (error) {
             console.error(error)
             setError(error.message)
+        } finally {
+            setActionSaving(false)
         }
     }
 
@@ -472,7 +474,7 @@ export default function LeavePage() {
                                             {leave.status === 'pending' && (
                                                 <button
                                                     type="button"
-                                                    onClick={() => deleteLeave(leave.leave_id)}
+                                                    onClick={() => setConfirmDelete(leave)}
                                                     className="inline-flex items-center gap-2 rounded-2xl border border-slate-300 px-4 py-2 text-sm hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800"
                                                 >
                                                     <FiTrash2 />
@@ -487,6 +489,46 @@ export default function LeavePage() {
                     )}
                 </section>
             </div>
+
+            {confirmDelete && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 px-4 py-6">
+                    <div className="w-full max-w-md rounded-lg border border-slate-200 bg-white p-5 shadow-xl dark:border-slate-800 dark:bg-slate-900">
+                        <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                            ยืนยันการลบคำขอลา
+                        </h2>
+                        <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+                            ต้องการลบคำขอลาของ {confirmDelete.full_name_th} ใช่ไหม?
+                        </p>
+                        <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm dark:border-slate-800 dark:bg-slate-950">
+                            <p className="font-medium text-slate-900 dark:text-slate-100">
+                                {getLeaveTypeLabel(confirmDelete.leave_type)}
+                            </p>
+                            <p className="mt-1 text-slate-500">
+                                {formatDate(confirmDelete.start_date)} - {formatDate(confirmDelete.end_date)}
+                            </p>
+                        </div>
+                        <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                            <button
+                                type="button"
+                                onClick={() => setConfirmDelete(null)}
+                                disabled={actionSaving}
+                                className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                            >
+                                ยกเลิก
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => deleteLeave(confirmDelete.leave_id)}
+                                disabled={actionSaving}
+                                className="inline-flex items-center justify-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-700 disabled:opacity-60"
+                            >
+                                <FiTrash2 className="h-4 w-4" />
+                                {actionSaving ? 'กำลังลบ...' : 'ลบคำขอ'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {confirmAction && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 px-4 py-6">

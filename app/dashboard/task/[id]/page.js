@@ -14,6 +14,7 @@ import {
     FiFolder,
     FiChevronLeft,
     FiChevronRight,
+    FiX,
 } from 'react-icons/fi'
 import TaskComments from './TaskCommnets'
 import TaskAttachments from './TaskAttachments'
@@ -177,6 +178,8 @@ export default function TaskDetailPage() {
     })
 
     const [loading, setLoading] = useState(true)
+    const [confirmDelete, setConfirmDelete] = useState(false)
+    const [deleting, setDeleting] = useState(false)
     const [error, setError] = useState('')
     const [activeTab, setActiveTab] = useState('detail')
     const tabs = [
@@ -226,12 +229,8 @@ export default function TaskDetailPage() {
     }
 
     const deleteTask = async () => {
-        const confirmed =
-            window.confirm(`ต้องการลบงาน "${task.task_name}" หรือไม่?`)
-
-        if (!confirmed) return
-
         try {
+            setDeleting(true)
             const res = await fetch(
                 `/api/v1/task/${task.task_id}`,
                 {
@@ -253,6 +252,8 @@ export default function TaskDetailPage() {
         } catch (error) {
             console.error(error)
             setError(error.message)
+        } finally {
+            setDeleting(false)
         }
     }
 
@@ -404,7 +405,7 @@ export default function TaskDetailPage() {
                         {permission.can_delete && (
                             <button
                                 type="button"
-                                onClick={deleteTask}
+                                onClick={() => setConfirmDelete(true)}
                                 className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-red-500 px-4 py-2 text-white hover:bg-red-600 sm:w-auto"
                             >
                                 <FiTrash2 />
@@ -687,6 +688,49 @@ export default function TaskDetailPage() {
 
                 </div>
             </div>
+
+            {confirmDelete && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 px-4 py-6">
+                    <div className="w-full max-w-md rounded-lg border border-slate-200 bg-white p-5 shadow-xl dark:border-slate-800 dark:bg-slate-900">
+                        <div className="flex items-start gap-4">
+                            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300">
+                                <FiTrash2 className="h-5 w-5" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                                <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                                    ยืนยันการลบงาน
+                                </h2>
+                                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                                    ต้องการลบ {'"'}
+                                    {task.task_name}
+                                    {'"'} ใช่ไหม?
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                            <button
+                                type="button"
+                                onClick={() => setConfirmDelete(false)}
+                                disabled={deleting}
+                                className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                            >
+                                <FiX className="h-4 w-4" />
+                                ยกเลิก
+                            </button>
+                            <button
+                                type="button"
+                                onClick={deleteTask}
+                                disabled={deleting}
+                                className="inline-flex items-center justify-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-700 disabled:opacity-60"
+                            >
+                                <FiTrash2 className="h-4 w-4" />
+                                {deleting ? 'กำลังลบ...' : 'ลบงาน'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
         </div>
     )

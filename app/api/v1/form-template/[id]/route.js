@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/app/lib/db'
 import { requirePermission } from '@/app/lib/permission'
+import { writeAuditLog } from '@/app/lib/auditLog'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -22,6 +23,14 @@ export async function GET(request, context) {
         if (auth.response) return auth.response
 
         const { id } = await context.params
+        const templateId = Number(id)
+
+        if (!templateId) {
+            return NextResponse.json(
+                { success: false, message: 'form_template_id ไม่ถูกต้อง' },
+                { status: 400 }
+            )
+        }
 
         const [rows] = await db.execute(
             `
@@ -33,6 +42,7 @@ export async function GET(request, context) {
                 paper_size,
                 orientation,
                 layout_json,
+                version,
                 status,
                 created_by,
                 updated_by,
@@ -43,7 +53,7 @@ export async function GET(request, context) {
             AND deleted_at IS NULL
             LIMIT 1
             `,
-            [Number(id)]
+            [templateId]
         )
 
         const template = rows[0]
@@ -86,7 +96,15 @@ export async function PUT(request, context) {
 
         const user = auth.user
         const { id } = await context.params
+        const templateId = Number(id)
         const body = await request.json().catch(() => null)
+
+        if (!templateId) {
+            return NextResponse.json(
+                { success: false, message: 'form_template_id ไม่ถูกต้อง' },
+                { status: 400 }
+            )
+        }
 
         if (!body) {
             return NextResponse.json(
@@ -111,6 +129,20 @@ export async function PUT(request, context) {
             )
         }
 
+        if (!['portrait', 'landscape'].includes(orientation)) {
+            return NextResponse.json(
+                { success: false, message: 'orientation ไม่ถูกต้อง' },
+                { status: 400 }
+            )
+        }
+
+        if (!['draft', 'active', 'inactive'].includes(status)) {
+            return NextResponse.json(
+                { success: false, message: 'status ไม่ถูกต้อง' },
+                { status: 400 }
+            )
+        }
+
         const [duplicateRows] = await db.execute(
             `
             SELECT form_template_id
@@ -120,7 +152,7 @@ export async function PUT(request, context) {
             AND deleted_at IS NULL
             LIMIT 1
             `,
-            [form_code, Number(id)]
+            [form_code, templateId]
         )
 
         if (duplicateRows.length > 0) {
@@ -139,6 +171,7 @@ export async function PUT(request, context) {
                 description = ?,
                 orientation = ?,
                 layout_json = ?,
+                version = version + 1,
                 status = ?,
                 updated_by = ?
             WHERE form_template_id = ?
@@ -152,7 +185,7 @@ export async function PUT(request, context) {
                 JSON.stringify(layout_json),
                 status,
                 user.id,
-                Number(id),
+                templateId,
             ]
         )
 
@@ -162,6 +195,25 @@ export async function PUT(request, context) {
                 { status: 404 }
             )
         }
+
+        await writeAuditLog({
+            actorId: user.id,
+            action: 'form_template.update',
+            entityType: 'form_template',
+            entityId: templateId,
+            summary: `Update form template ${form_name}`,
+            metadata: {
+                form_template_id: templateId,
+                form_name,
+                form_code,
+                status,
+                orientation,
+                version_bumped: true,
+                field_count: Array.isArray(layout_json?.fields)
+                    ? layout_json.fields.length
+                    : 0,
+            },
+        })
 
         return NextResponse.json({
             success: true,
@@ -191,6 +243,14 @@ export async function DELETE(request, context) {
 
         const user = auth.user
         const { id } = await context.params
+        const templateId = Number(id)
+
+        if (!templateId) {
+            return NextResponse.json(
+                { success: false, message: 'form_template_id ไม่ถูกต้อง' },
+                { status: 400 }
+            )
+        }
 
         const [result] = await db.execute(
             `
@@ -201,7 +261,7 @@ export async function DELETE(request, context) {
             WHERE form_template_id = ?
             AND deleted_at IS NULL
             `,
-            [user.id, Number(id)]
+            [user.id, templateId]
         )
 
         if (result.affectedRows === 0) {
@@ -210,6 +270,17 @@ export async function DELETE(request, context) {
                 { status: 404 }
             )
         }
+
+        await writeAuditLog({
+            actorId: user.id,
+            action: 'form_template.delete',
+            entityType: 'form_template',
+            entityId: templateId,
+            summary: `Delete form template ${templateId}`,
+            metadata: {
+                form_template_id: templateId,
+            },
+        })
 
         return NextResponse.json({
             success: true,

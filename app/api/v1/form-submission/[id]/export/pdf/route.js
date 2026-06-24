@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/app/lib/db'
 import { requirePermission } from '@/app/lib/permission'
+import { writeAuditLog } from '@/app/lib/auditLog'
 import PDFDocument from 'pdfkit'
 import fs from 'fs'
 import path from 'path'
@@ -99,10 +100,70 @@ function formatDateTime(value) {
     }
 }
 
+function normalizeTextAlign(value) {
+    return ['left', 'center', 'right'].includes(value)
+        ? value
+        : 'left'
+}
+
+function getIndentLevel(value) {
+    const parsed = Number(value)
+
+    if (!Number.isFinite(parsed)) {
+        return 0
+    }
+
+    return Math.min(Math.max(Math.trunc(parsed), 0), 6)
+}
+
+function getBoundedNumber(value, fallback, min, max) {
+    const parsed = Number(value)
+
+    if (!Number.isFinite(parsed)) {
+        return fallback
+    }
+
+    return Math.min(Math.max(Math.trunc(parsed), min), max)
+}
+
+function getRequiredColumns(field) {
+    return Array.isArray(field?.requiredColumns)
+        ? field.requiredColumns.filter(Boolean)
+        : []
+}
+
+function getStaticTextFontSize(field) {
+    return getBoundedNumber(field?.fontSize, 14, 8, 36)
+}
+
+function getStaticTextSpacing(field, key) {
+    return getBoundedNumber(field?.[key], 0, 0, 80)
+}
+
+function getPdfTextBox(field, x, width) {
+    const indent = getIndentLevel(field?.indentLevel) * 14
+    const safeIndent = Math.min(indent, Math.max(width - 48, 0))
+
+    return {
+        x: x + safeIndent,
+        width: width - safeIndent,
+        align: normalizeTextAlign(field?.textAlign),
+    }
+}
+
 function measureFieldHeight(field) {
     const options = Array.isArray(field.options) ? field.options : []
 
     switch (field.type) {
+        case 'static_text':
+            return Math.max(
+                36,
+                getStaticTextSpacing(field, 'spaceBefore') +
+                    getStaticTextSpacing(field, 'spaceAfter') +
+                    getStaticTextFontSize(field) * 3
+            )
+        case 'table':
+            return Math.max(78, 34 + (Number(field.rows) || 3) * 22)
         case 'textarea':
             return 96
         case 'radio':
@@ -177,22 +238,57 @@ function drawField(doc, field, data, x, y, width, height) {
     const label = `${field.label || 'Field'}${field.required ? ' *' : ''}`
     const value = getFieldValue(data, field)
     const options = Array.isArray(field.options) ? field.options : []
+    const columns = Array.isArray(field.columns) && field.columns.length
+        ? field.columns
+        : ['รายการ']
+    const requiredColumns = getRequiredColumns(field)
+    const textBox = getPdfTextBox(field, x, width)
+    const isStaticText = field.type === 'static_text'
 
-    doc
-        .fontSize(9.5)
-        .fillColor('#0f172a')
-        .text(label, x, y, {
-            width,
-            height: 16,
+    if (!isStaticText) {
+        doc
+            .fontSize(9.5)
+            .fillColor('#0f172a')
+            .text(label, textBox.x, y, {
+                width: textBox.width,
+                height: 16,
+                align: textBox.align,
+                ellipsis: true,
+            })
+    }
+
+    const contentY = isStaticText ? y : y + 20
+
+    if (isStaticText) {
+        const staticText = field.content || field.label || '-'
+        const staticY = contentY + getStaticTextSpacing(field, 'spaceBefore')
+        const textOptions = {
+            width: textBox.width,
+            height:
+                height -
+                getStaticTextSpacing(field, 'spaceBefore') -
+                getStaticTextSpacing(field, 'spaceAfter'),
+            align: textBox.align,
+            underline: Boolean(field.underline),
             ellipsis: true,
-        })
+        }
 
-    const contentY = y + 20
+        doc
+            .fontSize(getStaticTextFontSize(field))
+            .fillColor('#111827')
+            .text(staticText, textBox.x, staticY, textOptions)
+
+        if (field.bold) {
+            doc.text(staticText, textBox.x + 0.25, staticY, textOptions)
+        }
+
+        return
+    }
 
     if (['text', 'date', 'select'].includes(field.type)) {
         doc
-            .moveTo(x, contentY + 22)
-            .lineTo(x + width, contentY + 22)
+            .moveTo(textBox.x, contentY + 22)
+            .lineTo(textBox.x + textBox.width, contentY + 22)
             .strokeColor('#94a3b8')
             .lineWidth(0.7)
             .stroke()
@@ -200,9 +296,10 @@ function drawField(doc, field, data, x, y, width, height) {
         doc
             .fontSize(9)
             .fillColor('#111827')
-            .text(value, x + 2, contentY + 5, {
-                width: width - 4,
+            .text(value, textBox.x + 2, contentY + 5, {
+                width: textBox.width - 4,
                 height: 20,
+                align: textBox.align,
                 ellipsis: true,
             })
 
@@ -210,16 +307,78 @@ function drawField(doc, field, data, x, y, width, height) {
     }
 
     if (field.type === 'textarea') {
-        drawBox(doc, x, contentY, width, height - 24)
+        drawBox(doc, textBox.x, contentY, textBox.width, height - 24)
 
         doc
             .fontSize(8.5)
             .fillColor('#111827')
-            .text(value, x + 8, contentY + 8, {
-                width: width - 16,
+            .text(value, textBox.x + 8, contentY + 8, {
+                width: textBox.width - 16,
                 height: height - 38,
+                align: textBox.align,
                 ellipsis: true,
             })
+
+        return
+    }
+
+    if (field.type === 'table') {
+        const rowCount = Number(field.rows) || 3
+        const tableRows = Array.isArray(data?.[field.id])
+            ? data[field.id]
+            : []
+        const headerHeight = 18
+        const rowHeight = 22
+        const tableHeight = headerHeight + rowCount * rowHeight
+        const columnWidth = textBox.width / columns.length
+
+        drawBox(doc, textBox.x, contentY, textBox.width, tableHeight)
+
+        columns.forEach((column, index) => {
+            const colX = textBox.x + index * columnWidth
+            const headerLabel = requiredColumns.includes(column)
+                ? `${column} *`
+                : column
+
+            doc
+                .rect(colX, contentY, columnWidth, headerHeight)
+                .fillAndStroke('#f1f5f9', '#cbd5e1')
+
+            doc
+                .fontSize(7.5)
+                .fillColor('#0f172a')
+                .text(headerLabel, colX + 3, contentY + 4, {
+                    width: columnWidth - 6,
+                    height: headerHeight - 4,
+                    align: textBox.align,
+                    ellipsis: true,
+                })
+        })
+
+        Array.from({ length: rowCount }).forEach((_, rowIndex) => {
+            const rowY = contentY + headerHeight + rowIndex * rowHeight
+
+            columns.forEach((column, colIndex) => {
+                const colX = textBox.x + colIndex * columnWidth
+                const cellValue = tableRows[rowIndex]?.[column] || ''
+
+                doc
+                    .rect(colX, rowY, columnWidth, rowHeight)
+                    .strokeColor('#cbd5e1')
+                    .lineWidth(0.5)
+                    .stroke()
+
+                doc
+                    .fontSize(7.5)
+                    .fillColor('#111827')
+                    .text(cellValue || '-', colX + 3, rowY + 5, {
+                        width: columnWidth - 6,
+                        height: rowHeight - 6,
+                        align: textBox.align,
+                        ellipsis: true,
+                    })
+            })
+        })
 
         return
     }
@@ -228,16 +387,28 @@ function drawField(doc, field, data, x, y, width, height) {
         options.forEach((option, index) => {
             const optionY = contentY + index * 18
             const checked = value === option
+            const markerX =
+                textBox.align === 'right'
+                    ? textBox.x + textBox.width - 12
+                    : textBox.x
+            const textX =
+                textBox.align === 'right'
+                    ? textBox.x
+                    : textBox.x + 18
+            const textWidth =
+                textBox.align === 'right'
+                    ? textBox.width - 18
+                    : textBox.width - 20
 
             doc
-                .circle(x + 6, optionY + 6, 5)
+                .circle(markerX + 6, optionY + 6, 5)
                 .strokeColor('#64748b')
                 .lineWidth(0.7)
                 .stroke()
 
             if (checked) {
                 doc
-                    .circle(x + 6, optionY + 6, 2.5)
+                    .circle(markerX + 6, optionY + 6, 2.5)
                     .fillColor('#0f172a')
                     .fill()
             }
@@ -245,9 +416,10 @@ function drawField(doc, field, data, x, y, width, height) {
             doc
                 .fontSize(8.5)
                 .fillColor('#111827')
-                .text(option, x + 18, optionY, {
-                    width: width - 20,
+                .text(option, textX, optionY, {
+                    width: textWidth,
                     height: 16,
+                    align: textBox.align,
                     ellipsis: true,
                 })
         })
@@ -263,23 +435,36 @@ function drawField(doc, field, data, x, y, width, height) {
         options.forEach((option, index) => {
             const optionY = contentY + index * 18
             const checked = currentValue.includes(option)
+            const markerX =
+                textBox.align === 'right'
+                    ? textBox.x + textBox.width - 11
+                    : textBox.x
+            const textX =
+                textBox.align === 'right'
+                    ? textBox.x
+                    : textBox.x + 18
+            const textWidth =
+                textBox.align === 'right'
+                    ? textBox.width - 18
+                    : textBox.width - 20
 
             doc
-                .rect(x, optionY + 1, 11, 11)
+                .rect(markerX, optionY + 1, 11, 11)
                 .strokeColor('#64748b')
                 .lineWidth(0.7)
                 .stroke()
 
             if (checked) {
-                drawCheckMark(doc, x, optionY + 1)
+                drawCheckMark(doc, markerX, optionY + 1)
             }
 
             doc
                 .fontSize(8.5)
                 .fillColor('#111827')
-                .text(option, x + 18, optionY, {
-                    width: width - 20,
+                .text(option, textX, optionY, {
+                    width: textWidth,
                     height: 16,
+                    align: textBox.align,
                     ellipsis: true,
                 })
         })
@@ -291,14 +476,14 @@ function drawField(doc, field, data, x, y, width, height) {
         doc
             .fontSize(10)
             .fillColor('#111827')
-            .text(value === '-' ? '' : value, x, contentY + 22, {
-                width,
-                align: 'center',
+            .text(value === '-' ? '' : value, textBox.x, contentY + 22, {
+                width: textBox.width,
+                align: textBox.align,
             })
 
         doc
-            .moveTo(x + 20, contentY + 48)
-            .lineTo(x + width - 20, contentY + 48)
+            .moveTo(textBox.x + 20, contentY + 48)
+            .lineTo(textBox.x + textBox.width - 20, contentY + 48)
             .strokeColor('#64748b')
             .lineWidth(0.7)
             .stroke()
@@ -306,9 +491,9 @@ function drawField(doc, field, data, x, y, width, height) {
         doc
             .fontSize(8)
             .fillColor('#64748b')
-            .text('ลงชื่อ / Signature', x, contentY + 54, {
-                width,
-                align: 'center',
+            .text('ลงชื่อ / Signature', textBox.x, contentY + 54, {
+                width: textBox.width,
+                align: textBox.align,
             })
     }
 }
@@ -391,21 +576,28 @@ async function getSubmission(submissionId) {
             fs.form_template_id,
             fs.submission_no,
             fs.data_json,
+            fs.template_version,
             fs.status,
             fs.submitted_by,
             fs.submitted_at,
+            fs.decided_by,
+            fs.decided_at,
+            fs.decision_comment,
 
-            ft.form_name,
-            ft.form_code,
-            ft.description,
-            ft.layout_json,
+            COALESCE(fs.form_name_snapshot, ft.form_name) AS form_name,
+            COALESCE(fs.form_code_snapshot, ft.form_code) AS form_code,
+            COALESCE(fs.description_snapshot, ft.description) AS description,
+            COALESCE(fs.layout_snapshot_json, ft.layout_json) AS layout_json,
 
-            CONCAT(u.first_name_th, ' ', u.last_name_th) AS submitted_by_name
+            CONCAT(u.first_name_th, ' ', u.last_name_th) AS submitted_by_name,
+            CONCAT(du.first_name_th, ' ', du.last_name_th) AS decided_by_name
         FROM form_submission fs
         INNER JOIN form_template ft
             ON ft.form_template_id = fs.form_template_id
         INNER JOIN \`user\` u
             ON u.id = fs.submitted_by
+        LEFT JOIN \`user\` du
+            ON du.id = fs.decided_by
         WHERE fs.form_submission_id = ?
         AND fs.deleted_at IS NULL
         LIMIT 1
@@ -421,6 +613,7 @@ export async function GET(request, context) {
         const auth = await requirePermission(request, 'form.export')
         if (auth.response) return auth.response
 
+        const user = auth.user
         const { id } = await context.params
         const submissionId = Number(id)
 
@@ -497,6 +690,20 @@ export async function GET(request, context) {
 
         const buffer = await bufferPromise
         const filename = `${sanitizeFilename(submission.submission_no)}.pdf`
+
+        await writeAuditLog({
+            actorId: user.id,
+            action: 'form_submission.export_pdf',
+            entityType: 'form_submission',
+            entityId: submissionId,
+            summary: `Export form submission ${submission.submission_no}`,
+            metadata: {
+                form_submission_id: submissionId,
+                form_template_id: submission.form_template_id,
+                submission_no: submission.submission_no,
+                form_name: submission.form_name,
+            },
+        })
 
         return new NextResponse(buffer, {
             status: 200,

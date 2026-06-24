@@ -7,10 +7,19 @@ export async function POST(request) {
     const cronSecret =
         request.headers.get('x-cron-secret')
 
-    if (
-        process.env.CRON_SECRET &&
-        cronSecret !== process.env.CRON_SECRET
-    ) {
+    if (!process.env.CRON_SECRET) {
+        return NextResponse.json(
+            {
+                success: false,
+                message: 'Cron secret is not configured',
+            },
+            {
+                status: 500,
+            }
+        )
+    }
+
+    if (cronSecret !== process.env.CRON_SECRET) {
         return NextResponse.json(
             {
                 success: false,

@@ -1,19 +1,28 @@
 'use client'
 
+/* eslint-disable @next/next/no-img-element */
+
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
+    FiAlignCenter,
+    FiAlignLeft,
+    FiAlignRight,
     FiArrowDown,
     FiArrowUp,
+    FiBold,
     FiCheckSquare,
     FiClipboard,
     FiCopy,
+    FiCornerDownRight,
     FiFileText,
     FiImage,
+    FiMinus,
     FiMove,
     FiPlus,
     FiSave,
     FiTrash2,
+    FiUnderline,
 } from 'react-icons/fi'
 
 import {
@@ -38,6 +47,7 @@ import { CSS } from '@dnd-kit/utilities'
 const fieldTypes = [
     { type: 'text', label: 'ข้อความสั้น' },
     { type: 'textarea', label: 'ข้อความยาว' },
+    { type: 'static_text', label: 'กล่องข้อความ' },
     { type: 'date', label: 'วันที่' },
     { type: 'select', label: 'Dropdown' },
     { type: 'radio', label: 'Radio' },
@@ -46,6 +56,101 @@ const fieldTypes = [
     { type: 'signature', label: 'ลายเซ็น' },
     { type: 'page_break', label: 'ขึ้นหน้าใหม่' },
 ]
+
+const alignOptions = [
+    {
+        value: 'left',
+        label: 'ชิดซ้าย',
+        Icon: FiAlignLeft,
+    },
+    {
+        value: 'center',
+        label: 'กึ่งกลาง',
+        Icon: FiAlignCenter,
+    },
+    {
+        value: 'right',
+        label: 'ชิดขวา',
+        Icon: FiAlignRight,
+    },
+]
+
+const maxIndentLevel = 6
+
+function normalizeTextAlign(value) {
+    return ['left', 'center', 'right'].includes(value)
+        ? value
+        : 'left'
+}
+
+function getIndentLevel(value) {
+    const parsed = Number(value)
+
+    if (!Number.isFinite(parsed)) {
+        return 0
+    }
+
+    return Math.min(
+        Math.max(Math.trunc(parsed), 0),
+        maxIndentLevel
+    )
+}
+
+function getBoundedNumber(value, fallback, min, max) {
+    const parsed = Number(value)
+
+    if (!Number.isFinite(parsed)) {
+        return fallback
+    }
+
+    return Math.min(Math.max(Math.trunc(parsed), min), max)
+}
+
+function getStaticTextStyle(field) {
+    return {
+        fontSize: `${getBoundedNumber(field?.fontSize, 14, 8, 36)}px`,
+        fontWeight: field?.bold ? 700 : 400,
+        textDecoration: field?.underline ? 'underline' : 'none',
+        lineHeight: 1.65,
+        marginTop: `${getBoundedNumber(field?.spaceBefore, 0, 0, 80)}px`,
+        marginBottom: `${getBoundedNumber(field?.spaceAfter, 0, 0, 80)}px`,
+    }
+}
+
+function getRequiredColumns(field) {
+    return Array.isArray(field?.requiredColumns)
+        ? field.requiredColumns.filter(Boolean)
+        : []
+}
+
+function getFieldTextStyle(field) {
+    return {
+        textAlign: normalizeTextAlign(field?.textAlign),
+        paddingLeft: `${getIndentLevel(field?.indentLevel) * 18}px`,
+    }
+}
+
+function getAlignedFlexClass(field) {
+    switch (normalizeTextAlign(field?.textAlign)) {
+        case 'center':
+            return 'items-center text-center'
+        case 'right':
+            return 'items-end text-right'
+        default:
+            return 'items-start text-left'
+    }
+}
+
+function getAlignedRowClass(field) {
+    switch (normalizeTextAlign(field?.textAlign)) {
+        case 'center':
+            return 'justify-center text-center'
+        case 'right':
+            return 'justify-end text-right'
+        default:
+            return 'justify-start text-left'
+    }
+}
 
 function createId() {
     if (typeof crypto !== 'undefined' && crypto.randomUUID) {
@@ -61,6 +166,8 @@ function getDefaultFieldLabel(type) {
             return 'ข้อความสั้น'
         case 'textarea':
             return 'ข้อความยาว'
+        case 'static_text':
+            return 'กล่องข้อความ'
         case 'date':
             return 'วันที่'
         case 'select':
@@ -90,6 +197,8 @@ function createField(type) {
             label: 'ขึ้นหน้าใหม่',
             required: false,
             width: 'full',
+            textAlign: 'left',
+            indentLevel: 0,
             options: [],
         }
     }
@@ -102,8 +211,30 @@ function createField(type) {
             placeholder: '',
             required: false,
             width: 'full',
+            textAlign: 'left',
+            indentLevel: 0,
             columns: ['รายการ', 'จำนวน', 'หมายเหตุ'],
+            requiredColumns: [],
             rows: 3,
+            options: [],
+        }
+    }
+
+    if (type === 'static_text') {
+        return {
+            id,
+            type: 'static_text',
+            label: 'กล่องข้อความ',
+            content: 'พิมพ์ข้อความที่ต้องการแสดงในเอกสาร',
+            required: false,
+            width: 'full',
+            textAlign: 'left',
+            indentLevel: 0,
+            fontSize: 14,
+            bold: false,
+            underline: false,
+            spaceBefore: 0,
+            spaceAfter: 0,
             options: [],
         }
     }
@@ -115,6 +246,8 @@ function createField(type) {
         placeholder: '',
         required: false,
         width: 'full',
+        textAlign: 'left',
+        indentLevel: 0,
         options:
             type === 'select' || type === 'radio' || type === 'checkbox'
                 ? ['ตัวเลือกที่ 1', 'ตัวเลือกที่ 2']
@@ -250,14 +383,19 @@ function DocumentFooter({ meta, pageIndex, totalPages }) {
 function PreviewField({ field, selected, onSelect }) {
     const options = Array.isArray(field.options) ? field.options : []
     const columns = Array.isArray(field.columns) ? field.columns : []
+    const requiredColumns = getRequiredColumns(field)
     const rowCount = Number(field.rows) || 3
+    const textStyle = getFieldTextStyle(field)
+    const alignedFlexClass = getAlignedFlexClass(field)
+    const alignedRowClass = getAlignedRowClass(field)
 
     return (
         <button
             type="button"
             onClick={onSelect}
+            style={textStyle}
             className={`
-                a4-field w-full text-left
+                a4-field w-full
                 rounded-xl border p-3 transition
                 ${
                     selected
@@ -267,7 +405,7 @@ function PreviewField({ field, selected, onSelect }) {
             `}
         >
             <div className="mb-2 flex items-center justify-between gap-2 pr-10">
-                <p className="text-sm font-semibold text-slate-900">
+                <p className="min-w-0 flex-1 text-sm font-semibold text-slate-900">
                     {field.label || 'ไม่มีชื่อ field'}
                     {field.required && (
                         <span className="ml-1 text-red-500">*</span>
@@ -278,6 +416,15 @@ function PreviewField({ field, selected, onSelect }) {
                     {field.type}
                 </span>
             </div>
+
+            {field.type === 'static_text' && (
+                <div
+                    className="min-h-16 whitespace-pre-wrap rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 text-slate-700"
+                    style={getStaticTextStyle(field)}
+                >
+                    {field.content || field.label || 'กล่องข้อความ'}
+                </div>
+            )}
 
             {field.type === 'text' && (
                 <div className="h-9 border-b border-dashed border-slate-400 text-xs text-slate-400">
@@ -304,11 +451,11 @@ function PreviewField({ field, selected, onSelect }) {
             )}
 
             {field.type === 'radio' && (
-                <div className="space-y-2">
+                <div className={`flex flex-col gap-2 ${alignedFlexClass}`}>
                     {options.map((option, index) => (
                         <div
                             key={`${field.id}-${option}-${index}`}
-                            className="flex items-center gap-2 text-xs text-slate-600"
+                            className={`flex w-full items-center gap-2 text-xs text-slate-600 ${alignedRowClass}`}
                         >
                             <span className="h-3 w-3 rounded-full border border-slate-400" />
                             {option}
@@ -318,11 +465,11 @@ function PreviewField({ field, selected, onSelect }) {
             )}
 
             {field.type === 'checkbox' && (
-                <div className="space-y-2">
+                <div className={`flex flex-col gap-2 ${alignedFlexClass}`}>
                     {options.map((option, index) => (
                         <div
                             key={`${field.id}-${option}-${index}`}
-                            className="flex items-center gap-2 text-xs text-slate-600"
+                            className={`flex w-full items-center gap-2 text-xs text-slate-600 ${alignedRowClass}`}
                         >
                             <span className="h-3 w-3 rounded border border-slate-400" />
                             {option}
@@ -339,9 +486,15 @@ function PreviewField({ field, selected, onSelect }) {
                                 {columns.map((column, index) => (
                                     <th
                                         key={`${field.id}-col-${index}`}
-                                        className="border border-slate-300 px-2 py-2 text-left font-semibold"
+                                        className="border border-slate-300 px-2 py-2 font-semibold"
+                                        style={{
+                                            textAlign: normalizeTextAlign(field.textAlign),
+                                        }}
                                     >
                                         {column}
+                                        {requiredColumns.includes(column) && (
+                                            <span className="ml-1 text-red-500">*</span>
+                                        )}
                                     </th>
                                 ))}
                             </tr>
@@ -720,7 +873,35 @@ export default function FormBuilderEditor({ templateId = null }) {
             .map((item) => item.trim())
             .filter(Boolean)
 
-        updateField('columns', columns)
+        if (!selectedFieldId) return
+
+        setFields((prev) =>
+            prev.map((field) =>
+                field.id === selectedFieldId
+                    ? {
+                          ...field,
+                          columns,
+                          requiredColumns: getRequiredColumns(field).filter(
+                              (column) => columns.includes(column)
+                          ),
+                      }
+                    : field
+            )
+        )
+    }
+
+    const updateRequiredColumnsFromText = (value) => {
+        const requiredColumns = value
+            .split('\n')
+            .map((item) => item.trim())
+            .filter(Boolean)
+
+        updateField(
+            'requiredColumns',
+            requiredColumns.filter((column) =>
+                (selectedField?.columns || []).includes(column)
+            )
+        )
     }
 
     const saveTemplate = async () => {
@@ -1228,7 +1409,9 @@ export default function FormBuilderEditor({ templateId = null }) {
 
                                 <div>
                                     <label className="text-sm text-slate-500">
-                                        Label
+                                        {selectedField.type === 'static_text'
+                                            ? 'ชื่อกล่อง'
+                                            : 'Label'}
                                     </label>
                                     <input
                                         value={selectedField.label || ''}
@@ -1239,7 +1422,162 @@ export default function FormBuilderEditor({ templateId = null }) {
                                     />
                                 </div>
 
-                                {!['table'].includes(selectedField.type) && (
+                                {selectedField.type === 'static_text' && (
+                                    <div>
+                                        <label className="text-sm text-slate-500">
+                                            ข้อความในกล่อง
+                                        </label>
+                                        <textarea
+                                            value={selectedField.content || ''}
+                                            onChange={(e) =>
+                                                updateField('content', e.target.value)
+                                            }
+                                            className="mt-1 min-h-32 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-sky-500 dark:border-slate-700 dark:bg-slate-950"
+                                        />
+                                    </div>
+                                )}
+
+                                {selectedField.type === 'static_text' && (
+                                    <div className="space-y-3 rounded-2xl border border-slate-200 p-3 dark:border-slate-800">
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <label>
+                                                <span className="text-sm text-slate-500">
+                                                    Font size
+                                                </span>
+                                                <input
+                                                    type="number"
+                                                    min="8"
+                                                    max="36"
+                                                    value={getBoundedNumber(
+                                                        selectedField.fontSize,
+                                                        14,
+                                                        8,
+                                                        36
+                                                    )}
+                                                    onChange={(e) =>
+                                                        updateField(
+                                                            'fontSize',
+                                                            getBoundedNumber(
+                                                                e.target.value,
+                                                                14,
+                                                                8,
+                                                                36
+                                                            )
+                                                        )
+                                                    }
+                                                    className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-sky-500 dark:border-slate-700 dark:bg-slate-950"
+                                                />
+                                            </label>
+
+                                            <div>
+                                                <span className="text-sm text-slate-500">
+                                                    Style
+                                                </span>
+                                                <div className="mt-1 grid grid-cols-2 gap-2">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() =>
+                                                            updateField(
+                                                                'bold',
+                                                                !selectedField.bold
+                                                            )
+                                                        }
+                                                        aria-label="Bold"
+                                                        title="Bold"
+                                                        className={`inline-flex h-10 items-center justify-center rounded-xl border text-sm ${
+                                                            selectedField.bold
+                                                                ? 'border-sky-500 bg-sky-50 text-sky-600 dark:bg-sky-950/50 dark:text-sky-300'
+                                                                : 'border-slate-300 text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800'
+                                                        }`}
+                                                    >
+                                                        <FiBold className="h-4 w-4" />
+                                                    </button>
+
+                                                    <button
+                                                        type="button"
+                                                        onClick={() =>
+                                                            updateField(
+                                                                'underline',
+                                                                !selectedField.underline
+                                                            )
+                                                        }
+                                                        aria-label="Underline"
+                                                        title="Underline"
+                                                        className={`inline-flex h-10 items-center justify-center rounded-xl border text-sm ${
+                                                            selectedField.underline
+                                                                ? 'border-sky-500 bg-sky-50 text-sky-600 dark:bg-sky-950/50 dark:text-sky-300'
+                                                                : 'border-slate-300 text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800'
+                                                        }`}
+                                                    >
+                                                        <FiUnderline className="h-4 w-4" />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <label>
+                                                <span className="text-sm text-slate-500">
+                                                    Space before
+                                                </span>
+                                                <input
+                                                    type="number"
+                                                    min="0"
+                                                    max="80"
+                                                    value={getBoundedNumber(
+                                                        selectedField.spaceBefore,
+                                                        0,
+                                                        0,
+                                                        80
+                                                    )}
+                                                    onChange={(e) =>
+                                                        updateField(
+                                                            'spaceBefore',
+                                                            getBoundedNumber(
+                                                                e.target.value,
+                                                                0,
+                                                                0,
+                                                                80
+                                                            )
+                                                        )
+                                                    }
+                                                    className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-sky-500 dark:border-slate-700 dark:bg-slate-950"
+                                                />
+                                            </label>
+
+                                            <label>
+                                                <span className="text-sm text-slate-500">
+                                                    Space after
+                                                </span>
+                                                <input
+                                                    type="number"
+                                                    min="0"
+                                                    max="80"
+                                                    value={getBoundedNumber(
+                                                        selectedField.spaceAfter,
+                                                        0,
+                                                        0,
+                                                        80
+                                                    )}
+                                                    onChange={(e) =>
+                                                        updateField(
+                                                            'spaceAfter',
+                                                            getBoundedNumber(
+                                                                e.target.value,
+                                                                0,
+                                                                0,
+                                                                80
+                                                            )
+                                                        )
+                                                    }
+                                                    className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-sky-500 dark:border-slate-700 dark:bg-slate-950"
+                                                />
+                                            </label>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {!['table', 'static_text'].includes(selectedField.type) && (
                                     <div>
                                         <label className="text-sm text-slate-500">
                                             Placeholder
@@ -1270,16 +1608,102 @@ export default function FormBuilderEditor({ templateId = null }) {
                                     </select>
                                 </div>
 
-                                <label className="flex items-center gap-3 rounded-2xl border border-slate-200 p-3 text-sm dark:border-slate-800">
-                                    <input
-                                        type="checkbox"
-                                        checked={Boolean(selectedField.required)}
-                                        onChange={(e) =>
-                                            updateField('required', e.target.checked)
-                                        }
-                                    />
-                                    จำเป็นต้องกรอก
-                                </label>
+                                <div>
+                                    <label className="text-sm text-slate-500">
+                                        จัดข้อความ
+                                    </label>
+                                    <div className="mt-1 grid grid-cols-3 gap-2">
+                                        {alignOptions.map(({ value, label, Icon }) => {
+                                            const active =
+                                                normalizeTextAlign(selectedField.textAlign) === value
+
+                                            return (
+                                                <button
+                                                    key={value}
+                                                    type="button"
+                                                    onClick={() => updateField('textAlign', value)}
+                                                    title={label}
+                                                    aria-label={label}
+                                                    className={`inline-flex h-11 items-center justify-center rounded-2xl border text-sm transition ${
+                                                        active
+                                                            ? 'border-sky-500 bg-sky-50 text-sky-600 dark:bg-sky-950/50 dark:text-sky-300'
+                                                            : 'border-slate-300 text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800'
+                                                    }`}
+                                                >
+                                                    <Icon className="h-4 w-4" />
+                                                </button>
+                                            )
+                                        })}
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label className="text-sm text-slate-500">
+                                        ย่อหน้า
+                                    </label>
+                                    <div className="mt-1 flex items-center gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() =>
+                                                updateField(
+                                                    'indentLevel',
+                                                    getIndentLevel(
+                                                        getIndentLevel(
+                                                            selectedField.indentLevel
+                                                        ) - 1
+                                                    )
+                                                )
+                                            }
+                                            disabled={getIndentLevel(selectedField.indentLevel) === 0}
+                                            title="ลดย่อหน้า"
+                                            aria-label="ลดย่อหน้า"
+                                            className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-300 text-slate-600 hover:bg-slate-100 disabled:opacity-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                                        >
+                                            <FiMinus className="h-4 w-4" />
+                                        </button>
+
+                                        <div className="flex h-11 flex-1 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 text-sm font-medium text-slate-700 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200">
+                                            <FiCornerDownRight className="h-4 w-4 text-slate-400" />
+                                            {getIndentLevel(selectedField.indentLevel)}
+                                        </div>
+
+                                        <button
+                                            type="button"
+                                            onClick={() =>
+                                                updateField(
+                                                    'indentLevel',
+                                                    getIndentLevel(
+                                                        getIndentLevel(
+                                                            selectedField.indentLevel
+                                                        ) + 1
+                                                    )
+                                                )
+                                            }
+                                            disabled={
+                                                getIndentLevel(selectedField.indentLevel) >=
+                                                maxIndentLevel
+                                            }
+                                            title="เพิ่มย่อหน้า"
+                                            aria-label="เพิ่มย่อหน้า"
+                                            className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-300 text-slate-600 hover:bg-slate-100 disabled:opacity-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                                        >
+                                            <FiPlus className="h-4 w-4" />
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {selectedField.type !== 'static_text' && (
+                                    <label className="flex items-center gap-3 rounded-2xl border border-slate-200 p-3 text-sm dark:border-slate-800">
+                                        <input
+                                            type="checkbox"
+                                            checked={Boolean(selectedField.required)}
+                                            onChange={(e) =>
+                                                updateField('required', e.target.checked)
+                                            }
+                                        />
+                                        จำเป็นต้องกรอก
+                                    </label>
+                                )}
 
                                 {['select', 'radio', 'checkbox'].includes(
                                     selectedField.type
@@ -1311,6 +1735,23 @@ export default function FormBuilderEditor({ templateId = null }) {
                                                 }
                                                 className="mt-1 min-h-32 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-sky-500 dark:border-slate-700 dark:bg-slate-950"
                                             />
+                                        </div>
+
+                                        <div>
+                                            <label className="text-sm text-slate-500">
+                                                Column ที่ต้องกรอก แยกบรรทัดละ 1 Column
+                                            </label>
+                                            <textarea
+                                                value={(selectedField.requiredColumns || []).join('\n')}
+                                                onChange={(e) =>
+                                                    updateRequiredColumnsFromText(e.target.value)
+                                                }
+                                                placeholder={(selectedField.columns || []).join('\n')}
+                                                className="mt-1 min-h-24 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-sky-500 dark:border-slate-700 dark:bg-slate-950"
+                                            />
+                                            <p className="mt-1 text-xs text-slate-400">
+                                                ชื่อต้องตรงกับ Column ตาราง ระบบจะ validate เฉพาะแถวที่มีข้อมูล
+                                            </p>
                                         </div>
 
                                         <div>

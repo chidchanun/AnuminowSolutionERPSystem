@@ -40,6 +40,8 @@ const entityOptions = [
     { value: 'task', label: 'Task' },
     { value: 'task_comment', label: 'Task Comment' },
     { value: 'task_attachment', label: 'Task Attachment' },
+    { value: 'form_template', label: 'Form Template' },
+    { value: 'form_submission', label: 'Form Submission' },
 ]
 
 const actionOptions = [
@@ -83,6 +85,14 @@ const actionOptions = [
     { value: 'task.comment.delete', label: 'Task Comment Delete' },
     { value: 'task.attachment.create', label: 'Task Attachment Create' },
     { value: 'task.attachment.delete', label: 'Task Attachment Delete' },
+    { value: 'form_template.create', label: 'Form Template Create' },
+    { value: 'form_template.update', label: 'Form Template Update' },
+    { value: 'form_template.delete', label: 'Form Template Delete' },
+    { value: 'form_submission.create', label: 'Form Submission Create' },
+    { value: 'form_submission.approve', label: 'Form Submission Approve' },
+    { value: 'form_submission.reject', label: 'Form Submission Reject' },
+    { value: 'form_submission.export_pdf', label: 'Form Submission Export PDF' },
+    { value: 'form_submission.export_summary', label: 'Form Submission Export Summary' },
 ]
 
 function formatDateTime(value) {

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/app/lib/db'
 import { requirePermission } from '@/app/lib/permission'
+import { writeAuditLog } from '@/app/lib/auditLog'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -42,6 +43,7 @@ export async function GET(request) {
                 paper_size,
                 orientation,
                 layout_json,
+                version,
                 status,
                 created_by,
                 updated_by,
@@ -167,6 +169,24 @@ export async function POST(request) {
                 user.id,
             ]
         )
+
+        await writeAuditLog({
+            actorId: user.id,
+            action: 'form_template.create',
+            entityType: 'form_template',
+            entityId: result.insertId,
+            summary: `Create form template ${form_name}`,
+            metadata: {
+                form_template_id: result.insertId,
+                form_name,
+                form_code,
+                status,
+                orientation,
+                field_count: Array.isArray(layout_json?.fields)
+                    ? layout_json.fields.length
+                    : 0,
+            },
+        })
 
         return NextResponse.json(
             {

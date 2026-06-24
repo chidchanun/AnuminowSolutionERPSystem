@@ -126,6 +126,7 @@ export default function TaskAttachments({
     const [currentUserPermissions, setCurrentUserPermissions] = useState([])
 
     const [selectedFile, setSelectedFile] = useState(null)
+    const [confirmDelete, setConfirmDelete] = useState(null)
     const [loading, setLoading] = useState(true)
     const [uploading, setUploading] = useState(false)
     const [error, setError] = useState('')
@@ -267,11 +268,6 @@ export default function TaskAttachments({
     }
 
     const deleteAttachment = async (attachmentId) => {
-        const confirmed =
-            window.confirm('ต้องการลบไฟล์แนบนี้หรือไม่?')
-
-        if (!confirmed) return
-
         try {
             setUploading(true)
 
@@ -293,6 +289,7 @@ export default function TaskAttachments({
             }
 
             setError('')
+            setConfirmDelete(null)
             await loadAttachments()
         } catch (error) {
             console.error(error)
@@ -346,6 +343,41 @@ export default function TaskAttachments({
             {error && (
                 <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-600 dark:border-red-900 dark:bg-red-950">
                     {error}
+                </div>
+            )}
+
+            {confirmDelete && (
+                <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                            <p className="font-medium">
+                                ต้องการลบไฟล์แนบนี้ใช่ไหม?
+                            </p>
+                            <p className="mt-1 text-red-700/80 dark:text-red-200/80">
+                                {confirmDelete.original_name}
+                            </p>
+                        </div>
+                        <div className="flex gap-2">
+                            <button
+                                type="button"
+                                onClick={() => setConfirmDelete(null)}
+                                disabled={uploading}
+                                className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-700 hover:bg-slate-50 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                            >
+                                <FiX className="h-4 w-4" />
+                                ยกเลิก
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => deleteAttachment(confirmDelete.attachment_id)}
+                                disabled={uploading}
+                                className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-3 py-2 font-medium text-white hover:bg-red-700 disabled:opacity-60"
+                            >
+                                <FiTrash2 className="h-4 w-4" />
+                                {uploading ? 'กำลังลบ...' : 'ลบ'}
+                            </button>
+                        </div>
+                    </div>
                 </div>
             )}
 
@@ -498,11 +530,7 @@ export default function TaskAttachments({
                                 {canDelete(attachment) && (
                                     <button
                                         type="button"
-                                        onClick={() =>
-                                            deleteAttachment(
-                                                attachment.attachment_id
-                                            )
-                                        }
+                                        onClick={() => setConfirmDelete(attachment)}
                                         disabled={uploading}
                                         className="
                                             rounded-xl p-2 text-slate-400

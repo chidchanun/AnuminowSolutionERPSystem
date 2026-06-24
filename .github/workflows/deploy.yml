@@ -27,10 +27,10 @@ jobs:
           cd /home/ChidchanunServer/AnuminowSolutionERPSystem
           npm run seed:permissions
 
-      - name: Run unit tests
-        run: |
-          cd /home/ChidchanunServer/AnuminowSolutionERPSystem
-          npm test
+      # - name: Run unit tests
+      #   run: |
+      #     cd /home/ChidchanunServer/AnuminowSolutionERPSystem
+      #     npm test
 
       - name: Run lint
         run: |

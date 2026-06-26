@@ -71,7 +71,7 @@ jobs:
 
           pm2 describe erp > /dev/null \
             && pm2 restart erp --update-env \
-            || pm2 start npm --name erp -- start
+            || pm2 start npm --name erp -- start -- -p 3001
 
           pm2 describe erp-socket > /dev/null \
             && pm2 restart erp-socket --update-env \

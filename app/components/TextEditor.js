@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
     FiBold,
     FiItalic,
@@ -10,13 +10,13 @@ import {
     FiAlignCenter,
     FiAlignRight
 } from 'react-icons/fi'
-import { useEffect, useState } from 'react'
 
 export default function TextEditor({
     value,
     onChange
 }) {
     const editorRef = useRef(null)
+    const lastHtmlRef = useRef('')
     const [editorState, setEditorState] = useState({
         bold: false,
         italic: false,
@@ -29,7 +29,16 @@ export default function TextEditor({
     })
     const [fontSize, setFontSizeState] = useState('16px')
 
-    const updateToolbarState = () => {
+    const updateToolbarState = useCallback(() => {
+        const selection = window.getSelection()
+        const editor = editorRef.current
+
+        if (!selection || !editor) return
+
+        const anchorNode = selection.anchorNode
+
+        if (!anchorNode || !editor.contains(anchorNode)) return
+
         setEditorState({
             bold: document.queryCommandState('bold'),
             italic: document.queryCommandState('italic'),
@@ -60,8 +69,6 @@ export default function TextEditor({
                     'justifyRight'
                 ),
         })
-        const selection =
-            window.getSelection()
 
         if (selection.rangeCount > 0) {
             const node =
@@ -75,7 +82,14 @@ export default function TextEditor({
                 setFontSizeState(size)
             }
         }
-    }
+    }, [])
+
+    const syncChange = useCallback(() => {
+        const html = editorRef.current?.innerHTML || ''
+
+        lastHtmlRef.current = html
+        onChange(html)
+    }, [onChange])
 
     const exec = (command, value = null) => {
         editorRef.current?.focus()
@@ -88,10 +102,7 @@ export default function TextEditor({
 
         setTimeout(() => {
             updateToolbarState()
-
-            onChange(
-                editorRef.current?.innerHTML || ''
-            )
+            syncChange()
         }, 0)
     }
 
@@ -127,21 +138,31 @@ export default function TextEditor({
             range.insertNode(span)
         }
 
-        onChange(
-            editorRef.current?.innerHTML || ''
-        )
+        syncChange()
 
         updateToolbarState()
     }
 
+    const handleInput = useCallback((event) => {
+        const html = event.currentTarget.innerHTML
+
+        lastHtmlRef.current = html
+        onChange(html)
+    }, [onChange])
 
     useEffect(() => {
         const editor = editorRef.current
+        const nextValue = value || ''
 
-        if (editor && value) {
-            editor.innerHTML = value
-        }
+        if (!editor || nextValue === lastHtmlRef.current) return
 
+        if (document.activeElement === editor) return
+
+        editor.innerHTML = nextValue
+        lastHtmlRef.current = nextValue
+    }, [value])
+
+    useEffect(() => {
         document.addEventListener(
             'selectionchange',
             updateToolbarState
@@ -153,7 +174,7 @@ export default function TextEditor({
                 updateToolbarState
             )
         }
-    }, [value])
+    }, [updateToolbarState])
 
     return (
         <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm overflow-hidden">
@@ -280,9 +301,7 @@ export default function TextEditor({
 
                     [&_li]:my-1
                 "
-                onInput={(e) =>
-                    onChange(e.currentTarget.innerHTML)
-                }
+                onInput={handleInput}
             />
         </div>
     )
@@ -297,6 +316,7 @@ function ToolbarButton({
     return (
         <button
             type="button"
+            onMouseDown={(event) => event.preventDefault()}
             onClick={onClick}
             className={`
                 rounded-lg

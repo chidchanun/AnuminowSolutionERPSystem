@@ -60,6 +60,10 @@ test('getPagePermission resolves static dashboard routes', () => {
         getPagePermission('/dashboard/form/submission'),
         'form.view'
     )
+    assert.equal(
+        getPagePermission('/dashboard/form/inbox'),
+        'form.view'
+    )
 })
 
 test('getPagePermission resolves project routes in priority order', () => {
@@ -118,6 +122,10 @@ test('getPagePermission resolves form routes in priority order', () => {
     )
     assert.equal(
         getPagePermission('/dashboard/form/submission/22'),
+        'form.view'
+    )
+    assert.equal(
+        getPagePermission('/dashboard/form/inbox'),
         'form.view'
     )
 })

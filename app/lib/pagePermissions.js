@@ -64,6 +64,10 @@ const pagePermissionRules = [
         permissionKey: 'form.create',
     },
     {
+        pattern: /^\/dashboard\/form\/inbox\/?$/,
+        permissionKey: 'form.view',
+    },
+    {
         pattern: /^\/dashboard\/form\/submission(?:\/[^/]+)?\/?$/,
         permissionKey: 'form.view',
     },

@@ -27,6 +27,18 @@ const formSubmissionSummaryRouteSource = await readFile(
     new URL('../app/api/v1/form-submission/summary/route.js', import.meta.url),
     'utf8'
 )
+const formSubmissionInboxRouteSource = await readFile(
+    new URL('../app/api/v1/form-submission/inbox/route.js', import.meta.url),
+    'utf8'
+)
+const formTemplateDuplicateRouteSource = await readFile(
+    new URL('../app/api/v1/form-template/[id]/duplicate/route.js', import.meta.url),
+    'utf8'
+)
+const formTemplateRestoreRouteSource = await readFile(
+    new URL('../app/api/v1/form-template/[id]/restore/route.js', import.meta.url),
+    'utf8'
+)
 
 const mockState = {
     authUser: null,
@@ -35,6 +47,9 @@ const mockState = {
     executeQueue: [],
     executeCalls: [],
     auditLogCalls: [],
+    formSubmittedNotificationCalls: [],
+    formDecisionNotificationCalls: [],
+    emitNotificationCalls: [],
 }
 
 function resetMockState() {
@@ -44,6 +59,9 @@ function resetMockState() {
     mockState.executeQueue = []
     mockState.executeCalls = []
     mockState.auditLogCalls = []
+    mockState.formSubmittedNotificationCalls = []
+    mockState.formDecisionNotificationCalls = []
+    mockState.emitNotificationCalls = []
 }
 
 const mockDb = {
@@ -137,12 +155,33 @@ async function loadRouteModule(source, identifier) {
                         response: mockState.authResponse,
                     }
                 },
+                hasPermissionKey(user, permissionKey) {
+                    return Array.isArray(user?.permissions) &&
+                        user.permissions.includes(permissionKey)
+                },
             })
         } else if (specifier === '@/app/lib/auditLog') {
             vmModule = await createMockModule(specifier, {
                 async writeAuditLog(payload) {
                     mockState.auditLogCalls.push(payload)
                     return true
+                },
+            })
+        } else if (specifier === '@/app/lib/formNotify') {
+            vmModule = await createMockModule(specifier, {
+                async createFormSubmittedNotifications(payload) {
+                    mockState.formSubmittedNotificationCalls.push(payload)
+                    return ['APPROVER_1']
+                },
+                async createFormDecisionNotification(payload) {
+                    mockState.formDecisionNotificationCalls.push(payload)
+                    return [payload.submitterId]
+                },
+            })
+        } else if (specifier === '@/app/lib/socketEmit') {
+            vmModule = await createMockModule(specifier, {
+                async emitNotificationToUsers(userIds) {
+                    mockState.emitNotificationCalls.push(userIds)
                 },
             })
         } else {
@@ -184,6 +223,18 @@ const formSubmissionDetailRoute = await loadRouteModule(
 const formSubmissionSummaryRoute = await loadRouteModule(
     formSubmissionSummaryRouteSource,
     'app/api/v1/form-submission/summary/route.js'
+)
+const formSubmissionInboxRoute = await loadRouteModule(
+    formSubmissionInboxRouteSource,
+    'app/api/v1/form-submission/inbox/route.js'
+)
+const formTemplateDuplicateRoute = await loadRouteModule(
+    formTemplateDuplicateRouteSource,
+    'app/api/v1/form-template/[id]/duplicate/route.js'
+)
+const formTemplateRestoreRoute = await loadRouteModule(
+    formTemplateRestoreRouteSource,
+    'app/api/v1/form-template/[id]/restore/route.js'
 )
 
 test('POST /api/v1/form-template requires form.create and writes audit log', async () => {
@@ -344,6 +395,14 @@ test('POST /api/v1/form-template/:id/submit requires form.fill and writes audit 
         call.sql.includes('INSERT INTO form_submission_history')
     )
     assert.deepEqual(historyCall.params, [55, 'U001'])
+    assert.deepEqual(mockState.formSubmittedNotificationCalls[0], {
+        formSubmissionId: 55,
+        submissionNo: response.body.submission_no,
+        formName: 'Purchase Request',
+        submitterId: 'U001',
+        createdBy: 'U001',
+    })
+    assert.deepEqual(mockState.emitNotificationCalls[0], ['APPROVER_1'])
 })
 
 test('POST /api/v1/form-template/:id/submit ignores static text fields during validation', async () => {
@@ -569,6 +628,16 @@ test('PATCH /api/v1/form-submission/:id approves submission and writes audit log
     assert.equal(mockState.executeCalls[2].params[3], 'approve')
     assert.equal(mockState.auditLogCalls[0].action, 'form_submission.approve')
     assert.equal(mockState.auditLogCalls[0].metadata.to_status, 'approved')
+    assert.deepEqual(mockState.formDecisionNotificationCalls[0], {
+        formSubmissionId: 55,
+        submissionNo: 'FORM-55',
+        formName: undefined,
+        submitterId: 'U001',
+        approverId: 'U002',
+        status: 'approved',
+        comment: 'Looks good',
+    })
+    assert.deepEqual(mockState.emitNotificationCalls[0], ['U001'])
 })
 
 test('PATCH /api/v1/form-submission/:id blocks self approval', async () => {
@@ -693,4 +762,108 @@ test('GET /api/v1/form-submission/summary CSV requires form.export and audits ex
     assert.equal(response.body.includes('total_submissions,1'), true)
     assert.equal(response.body.includes('FORM-55'), true)
     assert.equal(mockState.auditLogCalls[0].action, 'form_submission.export_summary')
+})
+
+test('GET /api/v1/form-submission/inbox returns pending approvals for approvers', async () => {
+    resetMockState()
+    mockState.authUser = { id: 'U002', permissions: ['form.view', 'form.approve'] }
+    mockState.executeQueue.push(
+        [[{ total: 1 }]],
+        [[
+            {
+                form_submission_id: 55,
+                submission_no: 'FORM-55',
+                status: 'submitted',
+                submitted_by: 'U001',
+                form_name: 'Purchase Request',
+                submitted_by_name: 'Jane User',
+            },
+        ]]
+    )
+
+    const response = await formSubmissionInboxRoute.GET({
+        url: 'http://localhost/api/v1/form-submission/inbox?scope=pending_approval&search=PR&page=1&limit=10',
+    })
+
+    assert.equal(response.status, 200)
+    assert.deepEqual(mockState.requirePermissionCalls, ['form.view'])
+    assert.equal(response.body.can_approve, true)
+    assert.equal(response.body.submissions.length, 1)
+    assert.equal(mockState.executeCalls[0].params[0], 'U002')
+    assert.equal(mockState.executeCalls[1].sql.includes("fs.status = 'submitted'"), true)
+})
+
+test('GET /api/v1/form-submission/inbox hides pending approvals without form.approve', async () => {
+    resetMockState()
+    mockState.authUser = { id: 'U003', permissions: ['form.view'] }
+    mockState.executeQueue.push(
+        [[{ total: 0 }]],
+        [[]]
+    )
+
+    const response = await formSubmissionInboxRoute.GET({
+        url: 'http://localhost/api/v1/form-submission/inbox?scope=pending_approval',
+    })
+
+    assert.equal(response.status, 200)
+    assert.equal(response.body.can_approve, false)
+    assert.equal(mockState.executeCalls[0].sql.includes('1 = 0'), true)
+})
+
+test('POST /api/v1/form-template/:id/duplicate creates a draft copy', async () => {
+    resetMockState()
+    mockState.executeQueue.push(
+        [[
+            {
+                form_template_id: 22,
+                form_name: 'Purchase Request',
+                form_code: 'PR',
+                description: 'Request approval',
+                paper_size: 'A4',
+                orientation: 'portrait',
+                layout_json: JSON.stringify({
+                    fields: [{ id: 'name', type: 'text', label: 'Name' }],
+                }),
+            },
+        ]],
+        [[]],
+        [{ insertId: 77 }]
+    )
+
+    const response = await formTemplateDuplicateRoute.POST(
+        createJsonRequest({}),
+        createContext(22)
+    )
+
+    assert.equal(response.status, 201)
+    assert.deepEqual(mockState.requirePermissionCalls, ['form.create'])
+    assert.equal(response.body.form_template_id, 77)
+    assert.equal(response.body.form_code, 'PR-COPY')
+    assert.equal(mockState.executeCalls[2].params[6], 'U001')
+    assert.equal(mockState.auditLogCalls[0].action, 'form_template.duplicate')
+})
+
+test('PATCH /api/v1/form-template/:id/restore restores an archived template', async () => {
+    resetMockState()
+    mockState.executeQueue.push(
+        [[
+            {
+                form_template_id: 22,
+                form_name: 'Purchase Request',
+                form_code: 'PR',
+            },
+        ]],
+        [[]],
+        [{ affectedRows: 1 }]
+    )
+
+    const response = await formTemplateRestoreRoute.PATCH(
+        createJsonRequest({}),
+        createContext(22)
+    )
+
+    assert.equal(response.status, 200)
+    assert.deepEqual(mockState.requirePermissionCalls, ['form.delete'])
+    assert.equal(mockState.executeCalls[2].sql.includes('deleted_at = NULL'), true)
+    assert.equal(mockState.auditLogCalls[0].action, 'form_template.restore')
 })

@@ -88,6 +88,8 @@ const actionOptions = [
     { value: 'form_template.create', label: 'Form Template Create' },
     { value: 'form_template.update', label: 'Form Template Update' },
     { value: 'form_template.delete', label: 'Form Template Delete' },
+    { value: 'form_template.duplicate', label: 'Form Template Duplicate' },
+    { value: 'form_template.restore', label: 'Form Template Restore' },
     { value: 'form_submission.create', label: 'Form Submission Create' },
     { value: 'form_submission.approve', label: 'Form Submission Approve' },
     { value: 'form_submission.reject', label: 'Form Submission Reject' },

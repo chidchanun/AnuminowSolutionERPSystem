@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { db } from '@/app/lib/db'
 import { requirePermission } from '@/app/lib/permission'
 import { writeAuditLog } from '@/app/lib/auditLog'
+import { createFormSubmittedNotifications } from '@/app/lib/formNotify'
+import { emitNotificationToUsers } from '@/app/lib/socketEmit'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -240,6 +242,17 @@ export async function POST(request, context) {
                 submission_no: submissionNo,
             },
         })
+
+        const notificationTargetUserIds =
+            await createFormSubmittedNotifications({
+                formSubmissionId: result.insertId,
+                submissionNo,
+                formName: template.form_name,
+                submitterId: user.id,
+                createdBy: user.id,
+            })
+
+        await emitNotificationToUsers(notificationTargetUserIds)
 
         return NextResponse.json(
             {

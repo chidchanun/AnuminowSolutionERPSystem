@@ -15,6 +15,11 @@ const headerRules = [
         welcome: 'Create reusable document forms and templates',
     },
     {
+        pattern: /^\/dashboard\/form\/inbox\/?$/,
+        title: 'Form Inbox',
+        welcome: 'Review approval requests and track submitted form documents',
+    },
+    {
         pattern: /^\/dashboard\/form\/submission\/[^/]+\/?$/,
         title: 'Form Submission Detail',
         welcome: 'Review submitted form data and export documents',

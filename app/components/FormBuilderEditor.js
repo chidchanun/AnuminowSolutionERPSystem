@@ -5,6 +5,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
+    FiAlertCircle,
     FiAlignCenter,
     FiAlignLeft,
     FiAlignRight,
@@ -286,6 +287,64 @@ function safeLayout(layout) {
             },
         },
     }
+}
+
+function getPublishIssues(meta, fields = []) {
+    const issues = []
+    const realFields = fields.filter((field) => field.type !== 'page_break')
+
+    if (!String(meta.form_name || '').trim()) {
+        issues.push('Form name is required')
+    }
+
+    if (!String(meta.form_code || '').trim()) {
+        issues.push('Form code is required')
+    }
+
+    if (realFields.length === 0) {
+        issues.push('Add at least one field')
+    }
+
+    realFields.forEach((field, index) => {
+        const fieldName = field.label || `Field ${index + 1}`
+
+        if (field.type !== 'static_text' && !String(field.label || '').trim()) {
+            issues.push(`${fieldName}: label is required`)
+        }
+
+        if (
+            ['select', 'radio', 'checkbox'].includes(field.type) &&
+            (!Array.isArray(field.options) || field.options.length === 0)
+        ) {
+            issues.push(`${fieldName}: add at least one option`)
+        }
+
+        if (
+            field.type === 'table' &&
+            (!Array.isArray(field.columns) || field.columns.length === 0)
+        ) {
+            issues.push(`${fieldName}: add at least one table column`)
+        }
+
+        if (
+            field.type === 'table' &&
+            Array.isArray(field.requiredColumns) &&
+            field.requiredColumns.some((column) =>
+                !(field.columns || []).includes(column)
+            )
+        ) {
+            issues.push(`${fieldName}: required columns must exist in table columns`)
+        }
+
+        if (
+            field.type === 'static_text' &&
+            !String(field.content || field.label || '').trim()
+        ) {
+            issues.push(`${fieldName}: text content is required`)
+        }
+    })
+
+    return issues
 }
 
 function paginateFields(fields = []) {
@@ -676,6 +735,10 @@ export default function FormBuilderEditor({ templateId = null }) {
         () => fields.find((field) => field.id === selectedFieldId) || null,
         [fields, selectedFieldId]
     )
+    const publishIssues = useMemo(
+        () => getPublishIssues(meta, fields),
+        [meta, fields]
+    )
 
     const layoutJson = useMemo(
         () => ({
@@ -924,6 +987,14 @@ export default function FormBuilderEditor({ templateId = null }) {
                 return
             }
 
+            if (meta.status === 'active' && publishIssues.length > 0) {
+                setError(
+                    `Cannot publish until fixed: ${publishIssues.join(', ')}`
+                )
+                setSaving(false)
+                return
+            }
+
             const payload = {
                 ...meta,
                 layout_json: layoutJson,
@@ -1023,6 +1094,40 @@ export default function FormBuilderEditor({ templateId = null }) {
                         {success}
                     </div>
                 )}
+
+                <section className="no-print rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                    <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                        <div className="flex gap-3">
+                            <div className={`inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${
+                                publishIssues.length === 0
+                                    ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300'
+                                    : 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300'
+                            }`}>
+                                <FiAlertCircle className="h-5 w-5" />
+                            </div>
+                            <div>
+                                <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                                    Publish validation
+                                </h2>
+                                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                                    {publishIssues.length === 0
+                                        ? 'Ready to publish as Active'
+                                        : `${publishIssues.length} item(s) need attention before Active`}
+                                </p>
+                            </div>
+                        </div>
+
+                        {publishIssues.length > 0 && (
+                            <div className="max-w-3xl rounded-2xl bg-slate-50 p-3 text-sm text-slate-600 dark:bg-slate-950 dark:text-slate-300">
+                                <ul className="list-disc space-y-1 pl-5">
+                                    {publishIssues.slice(0, 6).map((issue) => (
+                                        <li key={issue}>{issue}</li>
+                                    ))}
+                                </ul>
+                            </div>
+                        )}
+                    </div>
+                </section>
 
                 <div className="grid gap-6 xl:grid-cols-[360px_1fr_360px]">
                     <aside className="no-print space-y-6 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">

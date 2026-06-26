@@ -58,6 +58,12 @@ function getTypeLabel(type) {
             return 'Status'
         case 'task_due_soon':
             return 'Due Soon'
+        case 'form_approval':
+            return 'Form'
+        case 'form_approved':
+            return 'Approved'
+        case 'form_rejected':
+            return 'Rejected'
         default:
             return 'Notification'
     }
@@ -75,6 +81,12 @@ function getTypeClass(type) {
             return 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300'
         case 'task_due_soon':
             return 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300'
+        case 'form_approval':
+            return 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300'
+        case 'form_approved':
+            return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300'
+        case 'form_rejected':
+            return 'bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300'
         default:
             return 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
     }

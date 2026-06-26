@@ -4,6 +4,13 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
+    inputs:
+      run_form_setup:
+        description: Run npm run setup:form against the target database
+        required: false
+        default: false
+        type: boolean
 
 jobs:
   deploy:
@@ -22,26 +29,6 @@ jobs:
           cd /home/ChidchanunServer/AnuminowSolutionERPSystem
           npm ci
 
-      - name: Setup audit log schema
-        run: |
-          cd /home/ChidchanunServer/AnuminowSolutionERPSystem
-          npm run setup:audit-log
-
-      - name: Setup master data schema
-        run: |
-          cd /home/ChidchanunServer/AnuminowSolutionERPSystem
-          npm run setup:master-data
-
-      - name: Setup form schema
-        run: |
-          cd /home/ChidchanunServer/AnuminowSolutionERPSystem
-          npm run setup:form
-
-      - name: Seed permissions
-        run: |
-          cd /home/ChidchanunServer/AnuminowSolutionERPSystem
-          npm run seed:permissions
-
       - name: Run unit tests
         run: |
           cd /home/ChidchanunServer/AnuminowSolutionERPSystem
@@ -56,6 +43,27 @@ jobs:
         run: |
           cd /home/ChidchanunServer/AnuminowSolutionERPSystem
           npm run build
+
+      - name: Setup audit log schema
+        run: |
+          cd /home/ChidchanunServer/AnuminowSolutionERPSystem
+          npm run setup:audit-log
+
+      - name: Setup master data schema
+        run: |
+          cd /home/ChidchanunServer/AnuminowSolutionERPSystem
+          npm run setup:master-data
+
+      - name: Setup form schema manually
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_form_setup }}
+        run: |
+          cd /home/ChidchanunServer/AnuminowSolutionERPSystem
+          npm run setup:form
+
+      - name: Seed permissions
+        run: |
+          cd /home/ChidchanunServer/AnuminowSolutionERPSystem
+          npm run seed:permissions
 
       - name: Restart PM2 services
         run: |

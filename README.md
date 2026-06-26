@@ -59,6 +59,8 @@ npm run lint
 npm run build
 ```
 
+Manual QA checklist สำหรับ Form workflow อยู่ที่ `docs/form-manual-qa.md`
+
 ## Permission Model
 
 ระบบใช้ permission-based guard เป็นหลัก ทั้ง API และ page guard ควรอิง permission key ไม่ใช่ role ตรง ๆ
@@ -130,5 +132,7 @@ Validation เกิดฝั่ง API ตอน submit:
 npm run setup:form
 npm run seed:permissions
 ```
+
+ใน production ให้รัน `npm run setup:form` แบบ manual/controlled เท่านั้น เช่นผ่าน GitHub Actions `workflow_dispatch` พร้อมเลือก `run_form_setup` เพื่อหลีกเลี่ยงการเปลี่ยน schema โดยไม่ตั้งใจระหว่าง deploy ปกติ
 
 `CRON_SECRET` ต้องถูกตั้งค่าเสมอสำหรับ route notification/due-task เพื่อป้องกันการเรียก route จากภายนอกโดยไม่มี secret

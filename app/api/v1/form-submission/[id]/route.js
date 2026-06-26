@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { db } from '@/app/lib/db'
 import { requirePermission } from '@/app/lib/permission'
 import { writeAuditLog } from '@/app/lib/auditLog'
+import { createFormDecisionNotification } from '@/app/lib/formNotify'
+import { emitNotificationToUsers } from '@/app/lib/socketEmit'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -159,14 +161,17 @@ export async function PATCH(request, context) {
         const [rows] = await db.execute(
             `
             SELECT
-                form_submission_id,
-                form_template_id,
-                submission_no,
-                status,
-                submitted_by
-            FROM form_submission
-            WHERE form_submission_id = ?
-            AND deleted_at IS NULL
+                fs.form_submission_id,
+                fs.form_template_id,
+                fs.submission_no,
+                fs.status,
+                fs.submitted_by,
+                COALESCE(fs.form_name_snapshot, ft.form_name) AS form_name
+            FROM form_submission fs
+            INNER JOIN form_template ft
+                ON ft.form_template_id = fs.form_template_id
+            WHERE fs.form_submission_id = ?
+            AND fs.deleted_at IS NULL
             LIMIT 1
             `,
             [submissionId]
@@ -263,6 +268,19 @@ export async function PATCH(request, context) {
                 comment: comment || null,
             },
         })
+
+        const notificationTargetUserIds =
+            await createFormDecisionNotification({
+                formSubmissionId: submissionId,
+                submissionNo: submission.submission_no,
+                formName: submission.form_name,
+                submitterId: submission.submitted_by,
+                approverId: user.id,
+                status: nextStatus,
+                comment: comment || null,
+            })
+
+        await emitNotificationToUsers(notificationTargetUserIds)
 
         return NextResponse.json({
             success: true,

@@ -3,15 +3,17 @@
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import {
+    FiArchive,
     FiBarChart2,
     FiCheckCircle,
     FiClock,
+    FiCopy,
     FiDownload,
     FiFileText,
     FiFilter,
     FiPlus,
     FiRefreshCw,
-    FiTrash2,
+    FiRotateCcw,
     FiX,
     FiXCircle,
 } from 'react-icons/fi'
@@ -21,10 +23,13 @@ const statusOptions = [
     { value: 'draft', label: 'Draft' },
     { value: 'active', label: 'Active' },
     { value: 'inactive', label: 'Inactive' },
+    { value: 'archived', label: 'Archived' },
 ]
 
 function getStatusTone(status) {
     switch (status) {
+        case 'archived':
+            return 'bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-200'
         case 'active':
             return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300'
         case 'inactive':
@@ -127,25 +132,53 @@ async function deleteTemplate(templateId) {
     return data
 }
 
-function ConfirmDeleteCard({
+async function duplicateTemplate(templateId) {
+    const res = await fetch(`/api/v1/form-template/${templateId}/duplicate`, {
+        method: 'POST',
+    })
+
+    const data = await res.json()
+
+    if (!res.ok) {
+        throw new Error(data.message || 'Duplicate form template failed')
+    }
+
+    return data
+}
+
+async function restoreTemplate(templateId) {
+    const res = await fetch(`/api/v1/form-template/${templateId}/restore`, {
+        method: 'PATCH',
+    })
+
+    const data = await res.json()
+
+    if (!res.ok) {
+        throw new Error(data.message || 'Restore form template failed')
+    }
+
+    return data
+}
+
+function ConfirmArchiveCard({
     template,
     onCancel,
     onConfirm,
-    deleting,
+    archiving,
 }) {
     if (!template) return null
 
     return (
-        <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-200">
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100">
             <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <div>
                     <p className="font-medium">
-                        ต้องการลบแบบฟอร์ม {'"'}
+                        ต้องการ Archive แบบฟอร์ม {'"'}
                         {template.form_name}
                         {'"'} ใช่ไหม?
                     </p>
-                    <p className="mt-1 text-rose-700/80 dark:text-rose-200/80">
-                        รายการจะถูกซ่อนจากการใช้งาน แต่ audit log จะยังเก็บประวัติไว้
+                    <p className="mt-1 text-amber-800/80 dark:text-amber-100/80">
+                        รายการจะถูกซ่อนจากการใช้งาน แต่ submission และ audit log จะยังเก็บประวัติไว้
                     </p>
                 </div>
 
@@ -153,7 +186,7 @@ function ConfirmDeleteCard({
                     <button
                         type="button"
                         onClick={onCancel}
-                        disabled={deleting}
+                        disabled={archiving}
                         className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
                     >
                         <FiX className="h-4 w-4" />
@@ -162,11 +195,11 @@ function ConfirmDeleteCard({
                     <button
                         type="button"
                         onClick={onConfirm}
-                        disabled={deleting}
-                        className="inline-flex items-center justify-center gap-2 rounded-xl bg-rose-600 px-3 py-2 text-sm font-medium text-white hover:bg-rose-700 disabled:opacity-60"
+                        disabled={archiving}
+                        className="inline-flex items-center justify-center gap-2 rounded-xl bg-amber-600 px-3 py-2 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-60"
                     >
-                        <FiTrash2 className="h-4 w-4" />
-                        {deleting ? 'กำลังลบ...' : 'ลบแบบฟอร์ม'}
+                        <FiArchive className="h-4 w-4" />
+                        {archiving ? 'กำลัง Archive...' : 'Archive'}
                     </button>
                 </div>
             </div>
@@ -203,6 +236,7 @@ export default function FormPage() {
     const [confirmDelete, setConfirmDelete] = useState(null)
     const [loading, setLoading] = useState(true)
     const [deleting, setDeleting] = useState(false)
+    const [actionLoading, setActionLoading] = useState('')
     const [error, setError] = useState('')
     const [success, setSuccess] = useState('')
 
@@ -272,7 +306,7 @@ export default function FormPage() {
 
         try {
             await deleteTemplate(confirmDelete.form_template_id)
-            setSuccess(`ลบแบบฟอร์ม ${confirmDelete.form_name} สำเร็จ`)
+            setSuccess(`Archive แบบฟอร์ม ${confirmDelete.form_name} สำเร็จ`)
             setConfirmDelete(null)
             const [rows, report] = await Promise.all([
                 requestTemplates(statusFilter),
@@ -285,6 +319,40 @@ export default function FormPage() {
             setError(err.message || 'ลบแบบฟอร์มไม่สำเร็จ')
         } finally {
             setDeleting(false)
+        }
+    }
+
+    const handleDuplicateTemplate = async (item) => {
+        setActionLoading(`duplicate-${item.form_template_id}`)
+        setError('')
+        setSuccess('')
+
+        try {
+            const data = await duplicateTemplate(item.form_template_id)
+            setSuccess(`Duplicate form template success: ${data.form_code}`)
+            const rows = await requestTemplates(statusFilter)
+            setTemplates(rows)
+        } catch (err) {
+            setError(err.message || 'Duplicate form template failed')
+        } finally {
+            setActionLoading('')
+        }
+    }
+
+    const handleRestoreTemplate = async (item) => {
+        setActionLoading(`restore-${item.form_template_id}`)
+        setError('')
+        setSuccess('')
+
+        try {
+            await restoreTemplate(item.form_template_id)
+            setSuccess(`Restore form template ${item.form_name} success`)
+            const rows = await requestTemplates(statusFilter)
+            setTemplates(rows)
+        } catch (err) {
+            setError(err.message || 'Restore form template failed')
+        } finally {
+            setActionLoading('')
         }
     }
 
@@ -368,11 +436,11 @@ export default function FormPage() {
                     </div>
                 )}
 
-                <ConfirmDeleteCard
+                <ConfirmArchiveCard
                     template={confirmDelete}
                     onCancel={() => setConfirmDelete(null)}
                     onConfirm={confirmDeleteTemplate}
-                    deleting={deleting}
+                    archiving={deleting}
                 />
 
                 <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -522,61 +590,94 @@ export default function FormPage() {
                         <p className="text-sm text-slate-500">ยังไม่มีแบบฟอร์ม</p>
                     ) : (
                         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                            {templates.map((item) => (
-                                <div
-                                    key={item.form_template_id}
-                                    className="rounded-3xl border border-slate-200 p-5 dark:border-slate-800"
-                                >
-                                    <div className="flex items-start justify-between gap-3">
-                                        <div>
-                                            <h2 className="font-semibold text-slate-900 dark:text-slate-100">
-                                                {item.form_name}
-                                            </h2>
-                                            <p className="mt-1 text-xs text-slate-400">
-                                                {item.form_code}
+                            {templates.map((item) => {
+                                const isArchived = Boolean(item.deleted_at)
+
+                                return (
+                                        <div
+                                            key={item.form_template_id}
+                                            className="rounded-3xl border border-slate-200 p-5 dark:border-slate-800"
+                                        >
+                                            <div className="flex items-start justify-between gap-3">
+                                                <div>
+                                                    <h2 className="font-semibold text-slate-900 dark:text-slate-100">
+                                                        {item.form_name}
+                                                    </h2>
+                                                    <p className="mt-1 text-xs text-slate-400">
+                                                        {item.form_code}
+                                                    </p>
+                                                </div>
+
+                                                <span className={`rounded-full px-3 py-1 text-xs font-medium ${getStatusTone(isArchived ? 'archived' : item.status)}`}>
+                                                    {isArchived ? 'archived' : item.status}
+                                                </span>
+                                            </div>
+
+                                            <p className="mt-3 line-clamp-2 text-sm text-slate-500">
+                                                {item.description || 'ไม่มีคำอธิบาย'}
                                             </p>
+
+                                            <div className="mt-5 flex flex-wrap gap-2">
+                                                {canFillForm && !isArchived && item.status === 'active' && (
+                                                    <Link
+                                                        href={`/dashboard/form/${item.form_template_id}/fill`}
+                                                        className="rounded-2xl bg-sky-500 px-4 py-2 text-sm text-white hover:bg-sky-600"
+                                                    >
+                                                        กรอกฟอร์ม
+                                                    </Link>
+                                                )}
+
+                                                {canUpdateForm && !isArchived && (
+                                                    <Link
+                                                        href={`/dashboard/form/${item.form_template_id}/builder`}
+                                                        className="rounded-2xl border border-slate-300 px-4 py-2 text-sm hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800"
+                                                    >
+                                                        แก้ไข
+                                                    </Link>
+                                                )}
+
+                                                {canCreateForm && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleDuplicateTemplate(item)}
+                                                        disabled={actionLoading === `duplicate-${item.form_template_id}`}
+                                                        className="inline-flex items-center gap-2 rounded-2xl border border-slate-300 px-4 py-2 text-sm hover:bg-slate-100 disabled:opacity-60 dark:border-slate-700 dark:hover:bg-slate-800"
+                                                    >
+                                                        <FiCopy className="h-4 w-4" />
+                                                        {actionLoading === `duplicate-${item.form_template_id}`
+                                                            ? 'Duplicating...'
+                                                            : 'Duplicate'}
+                                                    </button>
+                                                )}
+
+                                                {canDeleteForm && !isArchived && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setConfirmDelete(item)}
+                                                        className="inline-flex items-center gap-2 rounded-2xl border border-rose-200 px-4 py-2 text-sm text-rose-700 hover:bg-rose-50 dark:border-rose-900 dark:text-rose-300 dark:hover:bg-rose-950/40"
+                                                    >
+                                                        <FiArchive className="h-4 w-4" />
+                                                        Archive
+                                                    </button>
+                                                )}
+
+                                                {canDeleteForm && isArchived && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleRestoreTemplate(item)}
+                                                        disabled={actionLoading === `restore-${item.form_template_id}`}
+                                                        className="inline-flex items-center gap-2 rounded-2xl bg-emerald-500 px-4 py-2 text-sm text-white hover:bg-emerald-600 disabled:opacity-60"
+                                                    >
+                                                        <FiRotateCcw className="h-4 w-4" />
+                                                        {actionLoading === `restore-${item.form_template_id}`
+                                                            ? 'Restoring...'
+                                                            : 'Restore'}
+                                                    </button>
+                                                )}
+                                            </div>
                                         </div>
-
-                                        <span className={`rounded-full px-3 py-1 text-xs font-medium ${getStatusTone(item.status)}`}>
-                                            {item.status}
-                                        </span>
-                                    </div>
-
-                                    <p className="mt-3 line-clamp-2 text-sm text-slate-500">
-                                        {item.description || 'ไม่มีคำอธิบาย'}
-                                    </p>
-
-                                    <div className="mt-5 flex flex-wrap gap-2">
-                                        {canFillForm && (
-                                            <Link
-                                                href={`/dashboard/form/${item.form_template_id}/fill`}
-                                                className="rounded-2xl bg-sky-500 px-4 py-2 text-sm text-white hover:bg-sky-600"
-                                            >
-                                                กรอกฟอร์ม
-                                            </Link>
-                                        )}
-
-                                        {canUpdateForm && (
-                                            <Link
-                                                href={`/dashboard/form/${item.form_template_id}/builder`}
-                                                className="rounded-2xl border border-slate-300 px-4 py-2 text-sm hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800"
-                                            >
-                                                แก้ไข
-                                            </Link>
-                                        )}
-
-                                        {canDeleteForm && (
-                                            <button
-                                                type="button"
-                                                onClick={() => setConfirmDelete(item)}
-                                                className="rounded-2xl border border-rose-200 px-4 py-2 text-sm text-rose-700 hover:bg-rose-50 dark:border-rose-900 dark:text-rose-300 dark:hover:bg-rose-950/40"
-                                            >
-                                                ลบ
-                                            </button>
-                                        )}
-                                    </div>
-                                </div>
-                            ))}
+                                )
+                            })}
                         </div>
                     )}
                 </section>

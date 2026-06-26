@@ -35,6 +35,12 @@ function getNotificationTypeLabel(type) {
             return 'เปลี่ยนสถานะงาน'
         case 'task_due_soon':
             return 'งานใกล้ครบกำหนด'
+        case 'form_approval':
+            return 'รออนุมัติฟอร์ม'
+        case 'form_approved':
+            return 'ฟอร์มอนุมัติแล้ว'
+        case 'form_rejected':
+            return 'ฟอร์มถูกปฏิเสธ'
         default:
             return type || 'แจ้งเตือน'
     }

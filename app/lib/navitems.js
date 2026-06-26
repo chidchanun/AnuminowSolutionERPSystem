@@ -51,6 +51,11 @@ export const navGroups = [
                         permissionKey: 'form.create',
                     },
                     {
+                        label: 'Form Inbox',
+                        href: '/dashboard/form/inbox',
+                        permissionKey: 'form.view',
+                    },
+                    {
                         label: 'เอกสารที่ส่งแล้ว',
                         href: '/dashboard/form/submission',
                         permissionKey: 'form.view',

@@ -26,7 +26,13 @@ export async function GET(request) {
         const status = searchParams.get('status') || 'all'
 
         const values = []
-        const where = ['deleted_at IS NULL']
+        const where = []
+
+        if (status === 'archived') {
+            where.push('deleted_at IS NOT NULL')
+        } else {
+            where.push('deleted_at IS NULL')
+        }
 
         if (status !== 'all' && ['draft', 'active', 'inactive'].includes(status)) {
             where.push('status = ?')
@@ -48,7 +54,8 @@ export async function GET(request) {
                 created_by,
                 updated_by,
                 created_at,
-                updated_at
+                updated_at,
+                deleted_at
             FROM form_template
             WHERE ${where.join(' AND ')}
             ORDER BY created_at DESC

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import AnuminowLogo from '../../public/AnuminowSolutionLogoNoBG.webp'
+import { FaEye, FaEyeLowVision  } from "react-icons/fa6";
 
 export default function LoginPage() {
     const router = useRouter()
@@ -182,7 +183,7 @@ export default function LoginPage() {
                                               transition-colors duration-200"
                                 disabled={loading}
                             >
-                                {showPassword ? '🙈' : '👁️'}
+                                {showPassword ? <FaEye/> : <FaEyeLowVision/>}
                             </button>
                         </div>
                     </div>
